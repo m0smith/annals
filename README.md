@@ -23,9 +23,10 @@ Resume a task (`annals-resume-task`)
 
 > Do the same as `desktop-read`.  Do not reload the non-file buffers.
 
-Archive a task (`annal-archive-task`)
+Archive a task (`annals-archive-task`)
 
 > Compress a task and move it to the `annals-archive-directory`.  If the task was active, suspend it first.
 
+Save the state of active tasks and keep them all active (`annals-checkpoint`)
 
-annals-checkpoint
+> Same as `desktop-save` on all the tasks.
