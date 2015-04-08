@@ -105,8 +105,9 @@ URL is the REST URL to call."
 
 (defun annals-jira-attribute (issue-or-id &rest keys)
   " ISSUE-OR-ID can either be a string Jira ID like \"ABC-123\" or the result of calling `annals-jira'"
-  (let ((jira-issue (if (stringp issue-or-id) (annals-jira issue-or-id) issue-or-id)))
-    (-reduce-from (lambda (map key) (cdr (assoc key map))) jira-issue keys)))
+  (when annals-jira-server
+    (let ((jira-issue (if (stringp issue-or-id) (annals-jira issue-or-id) issue-or-id)))
+      (-reduce-from (lambda (map key) (cdr (assoc key map))) jira-issue keys))))
  
 (defun annals-jira-summary (issue-or-id)
   " ISSUE-OR-ID can either be a string Jira ID like \"ABC-123\" or the result of calling `annals-jira'"
