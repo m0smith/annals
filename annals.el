@@ -55,7 +55,8 @@
   "The URL for the JIRA server or nil if it is not used"
   :group 'annals
   :package-version '(annals . "1.0")
-  :type 'string)
+  :type '(choice (const  :tag "Disabled" nil)
+		 (string :tag "URL")))
 
 ;;; Code:
 
@@ -65,17 +66,9 @@
 
 
 (defun annals-json-call (url)
-  "SERVICE is a known service to the malabat server 
+  "Call a URL expecting JSON back.  Return the JSON formatted as vectors and alists for the arrays and maps.
 
-   ARGS-PLIST is a list of '(key val key val ...). If pm is not
-  in the list, is is pulled from buffer.  Skip entries with a nil key or value
-
-  ARRAY-TYPE is for the JSON reader and can be 'list or 'vector.  Default to vector.
-
-  OBJECT-TYPE is for the JSON reader and can be `alist', `plist',
-  or `hash-table'.  Default to `alist'.
-
-  READTABLE is the JSON readtable, default to `json-reatable'."
+URL is the REST URL to call."
 
   (setq url-request-method "GET"
 	url-request-extra-headers nil
@@ -97,10 +90,12 @@
       rtnval)))
 
 (defun annals-jira-rest-url (issue-id)
-  (format "%s/rest/api/latest/issue/%s" annals-jira-server issue-id))
+  (when annals-jira-server
+    (format "%s/rest/api/latest/issue/%s" annals-jira-server issue-id)))
 
 (defun annals-jira-browse-url (issue-id)
-  (format "%s/browse/%s" annals-jira-server issue-id))
+  (when annals-jira-server
+      (format "%s/browse/%s" annals-jira-server issue-id)))
 
 (defun annals-jira (issue-id)
   (let ((url (annals-jira-rest-url issue-id)))
@@ -108,15 +103,18 @@
       (url-basic-auth (url-generic-parse-url url) t))
     (annals-json-call url)))
 
-(defun annals-jira-summary (issue-or-id)
+(defun annals-jira-attribute (issue-or-id &rest keys)
   " ISSUE-OR-ID can either be a string Jira ID like \"ABC-123\" or the result of calling `annals-jira'"
   (let ((jira-issue (if (stringp issue-or-id) (annals-jira issue-or-id) issue-or-id)))
-    (cdr (assoc 'summary (cdr (assoc 'fields jira-issue))))))
+    (-reduce-from (lambda (map key) (cdr (assoc key map))) jira-issue keys)))
+ 
+(defun annals-jira-summary (issue-or-id)
+  " ISSUE-OR-ID can either be a string Jira ID like \"ABC-123\" or the result of calling `annals-jira'"
+  (annals-jira-attribute issue-or-id 'fields 'summary))
 
 (defun annals-jira-self (issue-or-id)
   " ISSUE-OR-ID can either be a string Jira ID like \"ABC-123\" or the result of calling `annals-jira'"
-  (let ((jira-issue (if (stringp issue-or-id) (annals-jira issue-or-id) issue-or-id)))
-    (cdr (assoc 'self jira-issue))))
+  (annals-jira-attribute issue-or-id 'self))
 
 
 (defun annals-create-file (task-id file-name)
