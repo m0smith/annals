@@ -17,7 +17,7 @@ Start a new task (`annals-task`)
 
 > The user gives the task a name and it is created in a subdirectory of `annals-active-directory`.  It becomes the current task and any new buffers will belong to it.  
 
-Suspend a task (`annals-suspend-task`)
+Suspend a task (`annals-suspend`)
 
 > Do the same as `desktop-save` and `desktop-clear`. In addition, save off the state of interesting non-file buffers.
 
@@ -25,7 +25,7 @@ Resume a task (`annals-task`)
 
 > Do the same as `desktop-read`.  Do not reload the non-file buffers.
 
-Archive a task (`annals-archive-task`)
+Archive a task (`annals-archive`)
 
 > Compress a task and move it to the `annals-archive-directory`.  If the task was active, suspend it first.
 
