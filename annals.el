@@ -1,4 +1,4 @@
-2;; -*- lexical-binding: t -*-
+;; -*- lexical-binding: t -*-
 ;;; annals.el --- EMACS task based session manager and developer notebook 
 
 ;; Copyright (c) Matthew O. Smith <matt@m0smith.com>
@@ -35,7 +35,7 @@
 
 ;; See http://www.github.com/m0smith/annals/README.md
 ;;
-
+;; m0smith-malabar-mode-199
 
 ;;; Customization:
 
@@ -46,7 +46,13 @@
   :link '(url-link :tag "Github" "https://github.com/m0smith/annals/"))
 
 (defcustom annals-active-directory (expand-file-name "~/annals")
-  "Directory where all the tasks live"
+  "Directory where all the active tasks live"
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type 'directory)
+
+(defcustom annals-archive-directory (expand-file-name "~/annals/.archive")
+  "Directory where all the archived tasks live"
   :group 'annals
   :package-version '(annals . "1.0")
   :type 'directory)
@@ -57,6 +63,24 @@
   :package-version '(annals . "1.0")
   :type '(choice (const  :tag "Disabled" nil)
 		 (string :tag "URL")))
+
+(defcustom annals-github-api-server "https://api.github.com"
+  "The URL for the Github API server or nil if it is not used"
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type '(choice (const  :tag "Disabled" nil)
+		 (string :tag "URL")))
+
+(defcustom annals-github-browser-server "https://github.com"
+  "The URL for the Github browser or nil if it is not used"
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type '(choice (const  :tag "Disabled" nil)
+		 (string :tag "URL")))
+
+
+(defvar annals-active-task-id nil
+  "The currently active task id")
 
 ;;; Code:
 
@@ -89,16 +113,40 @@ URL is the REST URL to call."
       (when readtable (setq json-readtable json-readtable-old))
       rtnval)))
 
+(defun annals-task-summary (task-id task-dir)
+  "Given a task dir, extract the summary from the first line of the annals.org"
+  (let ((file-name (expand-file-name (annals-file-name-default task-id) task-dir)))
+    (when (file-readable-p file-name)
+      (with-temp-buffer
+	(insert-file-contents (expand-file-name (annals-file-name-default task-id) task-dir) nil 0 150 t)
+	(let ((start (progn (beginning-of-line) (point)))
+	      (end (progn (end-of-line) (point))))
+	  (goto-char start)
+	  (search-forward "]]" end t)
+	  (concat task-id " " (buffer-substring (point) end)))))))
+
+
+(defun annals-list-tasks ()
+  "Return an alist of task summary to task id.  See `annals-task-summary' for how the summary is created"
+  (let ((task-ids (directory-files annals-active-directory nil "^[^.]"))
+	(task-dirs (directory-files annals-active-directory t "^[^.]")))
+    (mapcar (lambda (i) (cons  (annals-task-summary (car i) (cdr i)) (car i))) (-zip task-ids task-dirs))))
+
+
+;;; 
+;;; JIRA
+;;
+
 (defun annals-jira-rest-url (issue-id)
-  (when annals-jira-server
+  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+"))
     (format "%s/rest/api/latest/issue/%s" annals-jira-server issue-id)))
 
 (defun annals-jira-browse-url (issue-id)
-  (when annals-jira-server
+  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+"))
       (format "%s/browse/%s" annals-jira-server issue-id)))
 
 (defun annals-jira (issue-id)
-  (let ((url (annals-jira-rest-url issue-id)))
+  (-when-let ((url (annals-jira-rest-url issue-id)))
     (unless (url-get-authentication url nil 'any t)
       (url-basic-auth (url-generic-parse-url url) t))
     (annals-json-call url)))
@@ -118,14 +166,70 @@ URL is the REST URL to call."
   (annals-jira-attribute issue-or-id 'self))
 
 
-(defun annals-create-file (task-id file-name)
-  "Create the note file for the task.  Pull information from Jira if TASK-ID is a Jira issue-id."
+(defun annals-jira-create-file (task-id file-name)
+  "Create the note file for the task.  Pull information from Jira if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a Jira issue or nil."
   (let* ((jira-issue (annals-jira task-id))
 	 (jira-summary (annals-jira-summary jira-issue))
-	 (title (if jira-summary 
-		    (format "* [[%s][%s]] %s\n\n" (annals-jira-browse-url task-id) task-id jira-summary) 
-		  (format "* %s" task-id))))
-    (write-region title "" file-name)))
+	 (title (when jira-summary 
+		    (format "* [[%s][%s]] %s\n\n" (annals-jira-browse-url task-id) task-id jira-summary) )))
+		  
+    (when title 
+      (write-region title "" file-name)
+      file-name)))
+
+
+;;;
+;;; Github
+;;;
+
+(defun annals-github-format ( pattern url issue-id)
+  (when (string-match "^\\([a-zA-Z0-9]+\\)-\\([-0-9a-zA-Z]+\\)-\\([0-9]+\\)$" issue-id)
+    (format pattern url (match-string 1 issue-id) 
+	    (match-string 2 issue-id) 
+	    (match-string 3 issue-id))))
+
+(defun annals-github-rest-url (issue-id)
+"Looks like https://api.github.com/repos/m0smith/malabar-mode/issues/134"
+  (when annals-github-api-server
+    (annals-github-format "%s/repos/%s/%s/issues/%s" annals-github-api-server issue-id)))
+
+(defun annals-github-browse-url (issue-id)
+"Looks like https://github.com/m0smith/malabar-mode/issues/134"
+  (when annals-github-browser-server
+      (annals-github-format "%s/%s/%s/issues/%s" annals-github-browser-server issue-id)))
+
+(defun annals-github (issue-id)
+  (-when-let (url (annals-github-rest-url issue-id))
+    (unless (url-get-authentication url nil 'any t)
+      (url-basic-auth (url-generic-parse-url url) t))
+    (annals-json-call url)))
+
+(defun annals-github-create-file (task-id file-name)
+  "Create the note file for the task.  Pull information from Jira if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a Jira issue or nil."
+  (let* ((github-issue (annals-github task-id))
+	 (github-summary (annals-jira-attribute github-issue 'title))
+	 (title (when github-summary 
+		    (format "* [[%s][%s]] %s\n\n" (annals-github-browse-url task-id) task-id github-summary) )))
+		  
+    (when title 
+      (write-region title "" file-name)
+      file-name)))
+
+(defun annals-default-create-file (task-id file-name)
+    (when task-id 
+      (write-region (format "* %s\n\n" task-id)  "" file-name)
+      file-name))
+
+(defun annals-read-task-id ()
+  "Prompts users for a task from the available tasks or allows the
+user to enter a new task id"
+  (let* ((tasks (annals-list-tasks))
+	 ;(def (car (rassoc annals-active-task-id tasks)))
+	 (prompt (format "Annals Task Id (default: %s): " annals-active-task-id))
+	 (key (completing-read prompt  tasks nil 'confirm))
+	 (val (cdr (assoc key tasks))))
+    (or val (if (= 0 (length key)) annals-active-task-id key))))
+    
 
 ;;;###autoload
 (defun annals-task (task-id)
@@ -138,18 +242,38 @@ not null, then the note file will default to a link to the issue and its summary
 
 If the currently active task is selected, simply call `annals-checkpoint'.
 "
-  (interactive "sAnnal Task Id:")
+  (interactive (list (annals-read-task-id)))
   (annals-checkpoint)
+  
   (let* ((full-dir (expand-file-name task-id annals-active-directory))
 	 (annal-file (expand-file-name (annals-file-name-default task-id) full-dir)))
-    (unless (string= desktop-dirname full-dir)
+    (unless (string= (file-name-as-directory desktop-dirname) 
+		     (file-name-as-directory full-dir))
+      (desktop-kill)
       (unless (file-directory-p full-dir)
 	(make-directory full-dir t))
       (desktop-read full-dir)
+      (setq annals-active-task-id task-id)
       (unless (file-regular-p annal-file)
-	(annals-create-file task-id annal-file))
+	(or
+	 (annals-jira-create-file task-id annal-file)
+	 (annals-github-create-file task-id annal-file)
+	 (annals-default-create-file task-id annal-file)))
       (find-file-other-window annal-file))))
 
+
+;;;###autoload
+(defun annals-archive (task-id)
+  "Archive task is TASK-ID.  This closes
+open buffers and saves the active desktop.  
+
+It also moves the task to the archive dir `annals-archive-directory'.
+"
+  (interactive (list (annals-read-task-id)))
+  (annals-checkpoint)
+  (make-directory (expand-file-name annals-archive-directory) t)
+  (rename-file (expand-file-name task-id annals-active-directory)
+	       (expand-file-name task-id annals-archive-directory)))
 
 (defun annals-checkpoint ()
   "Save the current state and keep it active"
