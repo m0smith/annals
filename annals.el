@@ -148,16 +148,15 @@ URL is the REST URL to call."
 ;;
 
 (defun annals-jira-rest-url (issue-id)
-  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+"))
+  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+" issue-id))
     (format "%s/rest/api/latest/issue/%s" annals-jira-server issue-id)))
 
 (defun annals-jira-browse-url (issue-id)
-  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+"))
+  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+" issue-id))
       (format "%s/browse/%s" annals-jira-server issue-id)))
 
 (defun annals-jira (issue-id)
-  (-when-let ((url (annals-jira-rest-url issue-id)))
-    (unless (url-get-authentication url nil 'any t)
+  (-when-let (url (annals-jira-rest-url issue-id))    (unless (url-get-authentication url nil 'any t)
       (url-basic-auth (url-generic-parse-url url) t))
     (annals-json-call url)))
 
@@ -276,7 +275,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 
 
 ;;;###autoload
-(defun annals-archive-task (task-id)
+(defun annals-archive (task-id)
   "Archive task is TASK-ID.  This closes
 open buffers and saves the active desktop.  
 
