@@ -79,6 +79,16 @@
 		 (string :tag "URL")))
 
 
+(defcustom annals-github-task-separator "-"
+  "Separator used in task-id to separator repo, project, and
+  issue id.  For example, if the annals-github-task-separator
+  were set to \"_\" then the task id for the first issue of the
+  annals project would be \"m0smith.annals.1\"."
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type 'string)
+
+
 (defvar annals-active-task-id nil
   "The currently active task id")
 
@@ -183,11 +193,14 @@ URL is the REST URL to call."
 ;;;
 
 (defun annals-github-format ( pattern url issue-id)
-  (when (string-match "^\\([a-zA-Z0-9]+\\)-\\([-0-9a-zA-Z]+\\)-\\([0-9]+\\)$" issue-id)
-    (format pattern url (match-string 1 issue-id) 
-	    (match-string 2 issue-id) 
-	    (match-string 3 issue-id))))
-
+  (let ((r-pat (format "^\\([a-zA-Z0-9]+\\)%s\\([-0-9a-zA-Z]+\\)%s\\([0-9]+\\)$" 
+		       annals-github-task-separator
+		       annals-github-task-separator)))
+    (when (string-match r-pat issue-id)
+      (format pattern url (match-string 1 issue-id) 
+	      (match-string 2 issue-id) 
+	      (match-string 3 issue-id))))
+  
 (defun annals-github-rest-url (issue-id)
 "Looks like https://api.github.com/repos/m0smith/malabar-mode/issues/134"
   (when annals-github-api-server
