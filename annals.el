@@ -276,7 +276,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 
 
 ;;;###autoload
-(defun annals-archive (task-id)
+(defun annals-archive-task (task-id)
   "Archive task is TASK-ID.  This closes
 open buffers and saves the active desktop.  
 
