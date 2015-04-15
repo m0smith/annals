@@ -273,6 +273,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 	 (annals-github-create-file task-id annal-file)
 	 (annals-default-create-file task-id annal-file)))
       (find-file-other-window annal-file)
+      (run-hooks 'annals-task-hook)
       (find-file-other-window full-dir))))
 
 ;;;###autoload
@@ -296,7 +297,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (message "annals is not active")))
 
 (defun annals-suspend ()
-  "Save the active desktop and turn off the desktop feature."
+  "Save the active desktop and turn off the annals feature."
   (interactive)
   (when desktop-dirname
     (desktop-save desktop-dirname t)
