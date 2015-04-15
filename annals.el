@@ -258,10 +258,11 @@ If the currently active task is selected, simply call `annals-checkpoint'.
   (annals-checkpoint)
   
   (let* ((full-dir (expand-file-name task-id annals-active-directory))
+	 (desktop-save-mode t)
 	 (annal-file (expand-file-name (annals-file-name-default task-id) full-dir)))
     (unless (string= (file-name-as-directory desktop-dirname) 
 		     (file-name-as-directory full-dir))
-      (desktop-kill)
+      (annals-suspend)
       (unless (file-directory-p full-dir)
 	(make-directory full-dir t))
       (desktop-read full-dir)
@@ -271,8 +272,8 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 	 (annals-jira-create-file task-id annal-file)
 	 (annals-github-create-file task-id annal-file)
 	 (annals-default-create-file task-id annal-file)))
-      (find-file-other-window annal-file))))
-
+      (find-file-other-window annal-file)
+      (find-file-other-window full-dir))))
 
 ;;;###autoload
 (defun annals-archive (task-id)
@@ -290,7 +291,17 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-checkpoint ()
   "Save the current state and keep it active"
   (interactive)
-  (desktop-save-in-desktop-dir))
+  (if desktop-dirname
+      (desktop-save-in-desktop-dir)
+    (message "annals is not active")))
+
+(defun annals-suspend ()
+  "Save the active desktop and turn off the desktop feature."
+  (interactive)
+  (when desktop-dirname
+    (desktop-save desktop-dirname t)
+    (setq desktop-dirname nil)))
+
 
 (provide 'annals)
 
