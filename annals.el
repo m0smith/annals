@@ -378,8 +378,13 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (desktop-save desktop-dirname t)
     (setq annals-active-task-id nil
 	  annals-session-stamp nil
+	  annals-buffer-name-counter 1
 	  desktop-dirname nil)))
 
+
+(add-hook 'desktop-no-desktop-file-hook 
+	  (lambda ()
+	    (setq annals-buffer-name-counter 1)))
 
 (provide 'annals)
 
