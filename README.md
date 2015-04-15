@@ -15,7 +15,7 @@ Of course it would rely heavily upon the built in desktop functionality.
 
 Start a new task (`annals-task`)
 
-> The user gives the task a name and it is created in a subdirectory of `annals-active-directory`.  It becomes the current task and any new buffers will belong to it.  
+> The user gives the task a name and it is created in a subdirectory of `annals-active-directory`.  It becomes the current task and any new buffers will belong to it.  Creates an annals.org in the task directory.  If the task id matches a Jira issue or github issue, pull information from that issue into the annals.org.
 
 Suspend a task (`annals-suspend`)
 
