@@ -100,7 +100,7 @@
   for saving to this name when `annals-checkpoint' is called.")
 
 (defvar annals-buffer-name-counter 1)
-
+(add-to-list 'desktop-globals-to-save 'annals-buffer-name-counter)
 
 ;;; Code:
 
@@ -283,16 +283,22 @@ user to enter a new task id"
 (defun annals-buffer-name-counter-next () 
   (let ((rtnval annals-buffer-name-counter))
     (setq annals-buffer-name-counter (+ 1 annals-buffer-name-counter))
+;    (add-dir-local-variable nil "annals-buffer-name-counter
     rtnval))
 
 ;;;###autoload
 (defun annals-buffer-name-create (&optional buffer)
-  "Add a `annals-buffer-name' to BUFFER, default to the current buffer.
+  "Add the buffer local variable `annals-buffer-name' to BUFFER, default to 
+the current buffer.
 
 Called interactively applies to the current buffer.
 
+Called in a buffer that already has `annals-buffer-name' set,
+will give it a new name.  This allows the user to keep the old
+version and start building a new version.
+
 Use this function in a hook to add the `annals-buffer-name' to
-a buffer.  Only appropriate for non-file buffers.  File buffer
+a buffer.  Only appropriate for non-file buffers.  File buffers
 are already handled.
 
 Example:  
@@ -304,7 +310,7 @@ Example:
     (setq annals-buffer-name
 	  (format "%s.%d"
 		  (replace-regexp-in-string "[*]" "" 
-					    (replace-regexp-in-string "[:-]" "-" (buffer-name)))
+					    (replace-regexp-in-string "[: ]" "-" (buffer-name)))
 		  (annals-buffer-name-counter-next)))))
 
 
