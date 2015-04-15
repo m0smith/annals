@@ -267,7 +267,12 @@ user to enter a new task id"
     (when (and annals-buffer-name annals-session-stamp)
       (let* ((file-name (format "%s-%s" annals-buffer-name annals-session-stamp))
 	    (full-name (expand-file-name file-name (annals-task-directory task-id))))
-	(write-region nil nil full-name)))))
+	(write-region (format "%s -*- mode: %s ; -*- %s\n" 
+			      (or comment-start "") 
+			      mode-name 
+			      (or comment-end ""))
+		      nil full-name)
+	(write-region nil nil full-name t)))))
 	   
 
 (defun annals-write-non-file-buffers ()
