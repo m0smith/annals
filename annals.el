@@ -91,6 +91,16 @@
 (defvar annals-active-task-id nil
   "The currently active task id")
 
+(defvar annals-session-stamp nil
+  "The session name.  Just set each time a task is started.")
+
+(defvar-local annals-buffer-name nil
+  "A buffer local variable to control inclusion of non-file
+  buffers in an annal.  If this is non-nil, it will mark a buffer
+  for saving to this name when `annals-checkpoint' is called.")
+
+(defvar annals-buffer-name-counter 1)
+
 ;;; Code:
 
 (defun annals-file-name-default (_task-id)
@@ -197,7 +207,7 @@ URL is the REST URL to call."
     (when (string-match r-pat issue-id)
       (format pattern url (match-string 1 issue-id) 
 	      (match-string 2 issue-id) 
-	      (match-string 3 issue-id))))
+	      (match-string 3 issue-id)))))
   
 (defun annals-github-rest-url (issue-id)
 "Looks like https://api.github.com/repos/m0smith/malabar-mode/issues/134"
@@ -240,7 +250,48 @@ user to enter a new task id"
 	 (key (completing-read prompt  tasks nil 'confirm))
 	 (val (cdr (assoc key tasks))))
     (or val (if (= 0 (length key)) annals-active-task-id key))))
-    
+
+
+(defun annals-task-directory (task-id)
+  (let* ((full-dir (expand-file-name task-id annals-active-directory)))
+    full-dir))
+
+(defun annals-write-non-file-buffer (task-id buffer)
+  (with-current-buffer buffer
+    (when (and annals-buffer-name annals-session-stamp)
+      (let* ((file-name (format "%s-%s" annals-buffer-name annals-session-stamp))
+	    (full-name (expand-file-name file-name (annals-task-directory task-id))))
+	(write-region nil nil full-name)))))
+	   
+
+(defun annals-write-non-file-buffers ()
+  (when annals-active-task-id
+    (mapcar (lambda (b) (annals-write-non-file-buffer annals-active-task-id b)) (buffer-list))))
+
+
+
+(defun annals-buffer-name-counter-next () 
+  (let ((rtnval annals-buffer-name-counter))
+    (setq annals-buffer-name-counter (+ 1 annals-buffer-name-counter))
+    rtnval))
+
+;;;###autoload
+(defun annals-buffer-name-create (&optional buffer)
+  "Use this function in a hook to add the `annals-buffer-name' to
+a buffer.  Only appropriate for non-file buffers.  File buffer
+are already handled.
+
+Example:  
+
+     (add-hook 'sql-login-hook 'annals-buffer-name-create)
+"
+  (with-current-buffer (or buffer (current-buffer))
+    (setq annals-buffer-name
+	  (format "%s.%d"
+		  (replace-regexp-in-string "[*]" "" 
+					    (replace-regexp-in-string "[:-]" "-" (buffer-name)))
+		  (annals-buffer-name-counter-next)))))
+
 
 ;;;###autoload
 (defun annals-task (task-id)
@@ -259,13 +310,15 @@ If the currently active task is selected, simply call `annals-checkpoint'.
   (let* ((full-dir (expand-file-name task-id annals-active-directory))
 	 (desktop-save-mode t)
 	 (annal-file (expand-file-name (annals-file-name-default task-id) full-dir)))
-    (unless (string= (file-name-as-directory desktop-dirname) 
-		     (file-name-as-directory full-dir))
+    (unless (and (boundp 'desktop-dirname) desktop-dirname full-dir
+	     (string= (file-name-as-directory desktop-dirname) 
+		      (file-name-as-directory full-dir)))
       (annals-suspend)
       (unless (file-directory-p full-dir)
 	(make-directory full-dir t))
       (desktop-read full-dir)
-      (setq annals-active-task-id task-id)
+      (setq annals-active-task-id task-id
+	    annals-session-stamp (format-time-string "%Y-%m-%d"))
       (unless (file-regular-p annal-file)
 	(or
 	 (annals-jira-create-file task-id annal-file)
@@ -291,16 +344,20 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-checkpoint ()
   "Save the current state and keep it active"
   (interactive)
-  (if desktop-dirname
-      (desktop-save-in-desktop-dir)
+  (if (and (boundp 'desktop-dirname) desktop-dirname)
+      (progn
+	(desktop-save-in-desktop-dir)
+	(annals-write-non-file-buffers))
     (message "annals is not active")))
 
 (defun annals-suspend ()
   "Save the active desktop and turn off the annals feature."
   (interactive)
-  (when desktop-dirname
+  (when (and (boundp 'desktop-dirname) desktop-dirname)
     (desktop-save desktop-dirname t)
-    (setq desktop-dirname nil)))
+    (setq annals-active-task-id nil
+	  annals-session-stamp nil
+	  desktop-dirname nil)))
 
 
 (provide 'annals)
