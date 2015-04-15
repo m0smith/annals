@@ -3,10 +3,10 @@ EMACS task based session manager and developer notebook
 
 When working in a task, such as a Jira issue, it would be nice to keep the state of EMACS, including non-file buffers like \*shell\*.  EMACS desktop.el already does this.  In addition, I would like to:
 - Optionally save the contents of earmuff buffers (\*shell\*, \*grep\*, etc), keeping a version per session ([gh-1](https://github.com/m0smith/annals/issues/1))
-- Manage a directory of desktops based on task name or JIRA issue id or github issue id
+- Manage a directory of desktops based on task name or JIRA issue id or github issue id (`annals-task`)
 - Integerate with org-mode task switching, clock in, clock out, etc.
 - Integerate with dir-mode by adding keystrokes to use a dir as a desktop ([gh-3](https://github.com/m0smith/annals/issues/3))
-- Easily switch tasks
+- Easily switch tasks (`annals-task`)
 - Allow multiple tasks to be active at the same time.  Buffers can belong to one or more active tasks.
 
 Of course it would rely heavily upon the built in desktop functionality.  
