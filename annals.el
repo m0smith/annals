@@ -35,7 +35,6 @@
 
 ;; See http://www.github.com/m0smith/annals/README.md
 ;;
-;; m0smith-malabar-mode-199
 
 ;;; Customization:
 
