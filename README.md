@@ -35,4 +35,4 @@ Save the state of active tasks and keep them all active (`annals-checkpoint`)
 
 ## Hooks
 
-`annals-task-hook` Run after the task has been initialized or switched.  The current task id will be in the variable annals-active-task-id
+`annals-task-hook` Run after the task has been initialized or switched.  The current task id will be in the variable `annals-active-task-id`.
