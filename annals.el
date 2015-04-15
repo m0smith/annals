@@ -101,6 +101,7 @@
 
 (defvar annals-buffer-name-counter 1)
 
+
 ;;; Code:
 
 (defun annals-file-name-default (_task-id)
@@ -165,7 +166,12 @@ URL is the REST URL to call."
       (format "%s/browse/%s" annals-jira-server issue-id)))
 
 (defun annals-jira (issue-id)
-  (-when-let (url (annals-jira-rest-url issue-id))    (unless (url-get-authentication url nil 'any t)
+  (setq 
+	url-http-extra-headers nil
+	)
+
+  (-when-let (url (annals-jira-rest-url issue-id))    
+    (unless (url-get-authentication url nil 'any t)
       (url-basic-auth (url-generic-parse-url url) t))
     (annals-json-call url)))
 
@@ -269,7 +275,6 @@ user to enter a new task id"
     (mapcar (lambda (b) (annals-write-non-file-buffer annals-active-task-id b)) (buffer-list))))
 
 
-
 (defun annals-buffer-name-counter-next () 
   (let ((rtnval annals-buffer-name-counter))
     (setq annals-buffer-name-counter (+ 1 annals-buffer-name-counter))
@@ -277,7 +282,11 @@ user to enter a new task id"
 
 ;;;###autoload
 (defun annals-buffer-name-create (&optional buffer)
-  "Use this function in a hook to add the `annals-buffer-name' to
+  "Add a `annals-buffer-name' to BUFFER, default to the current buffer.
+
+Called interactively applies to the current buffer.
+
+Use this function in a hook to add the `annals-buffer-name' to
 a buffer.  Only appropriate for non-file buffers.  File buffer
 are already handled.
 
@@ -285,6 +294,7 @@ Example:
 
      (add-hook 'sql-login-hook 'annals-buffer-name-create)
 "
+  (interactive)
   (with-current-buffer (or buffer (current-buffer))
     (setq annals-buffer-name
 	  (format "%s.%d"
