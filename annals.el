@@ -220,12 +220,8 @@ URL is the REST URL to call."
   (when annals-github-api-server
     (annals-github-format "%s/repos/%s/%s/issues/%s" annals-github-api-server issue-id)))
 
-(defun annals-github-browse-url (issue-id)
-"Looks like https://github.com/m0smith/malabar-mode/issues/134"
-  (when annals-github-browser-server
-      (annals-github-format "%s/%s/%s/issues/%s" annals-github-browser-server issue-id)))
-
 (defun annals-github (issue-id)
+  "Pull the JSON info for the github issue."
   (-when-let (url (annals-github-rest-url issue-id))
     (unless (url-get-authentication url nil 'any t)
       (url-basic-auth (url-generic-parse-url url) t))
@@ -235,8 +231,9 @@ URL is the REST URL to call."
   "Create the note file for the task.  Pull information from Jira if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a Jira issue or nil."
   (let* ((github-issue (annals-github task-id))
 	 (github-summary (annals-jira-attribute github-issue 'title))
+	 (github-url (annals-jira-attribute github-issue 'html_url))
 	 (title (when github-summary 
-		    (format "* [[%s][%s]] %s\n\n" (annals-github-browse-url task-id) task-id github-summary) )))
+		    (format "* [[%s][%s]] %s\n\n" github-url task-id github-summary) )))
 		  
     (when title 
       (write-region title "" file-name)
