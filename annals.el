@@ -259,6 +259,7 @@ user to enter a new task id"
 
 
 (defun annals-task-directory (task-id)
+  "Return the directory associated with a task.  Should be equivilent to `desktop-dirname', but not necessarily equal to the  `annals-active-task-id' when TASK-ID is the active task"
   (let* ((full-dir (expand-file-name task-id annals-active-directory)))
     full-dir))
 
@@ -351,13 +352,17 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 
 ;;;###autoload
 (defun annals-archive (task-id)
-  "Archive task is TASK-ID.  This closes
-open buffers and saves the active desktop.  
+  "Archive task is TASK-ID.  If the current task is the one being
+archived, closes open buffers and saves the active desktop before .
 
 It also moves the task to the archive dir `annals-archive-directory'.
 "
   (interactive (list (annals-read-task-id)))
-  (annals-checkpoint)
+
+  (if (and (stringp task-id) (string= task-id annals-active-task-id))
+      (annals-suspend)
+    (annals-checkpoint))
+
   (make-directory (expand-file-name annals-archive-directory) t)
   (rename-file (expand-file-name task-id annals-active-directory)
 	       (expand-file-name task-id annals-archive-directory)))
