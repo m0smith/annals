@@ -90,6 +90,17 @@
   :type 'string)
 
 
+(defcustom annals-create-file-hook (list 'annals-jira-create-file 'annals-github-create-file 'annals-default-create-file)
+  "A list of functions to call to create the annals.org.  The
+function should accept 2 parameters: task-id and file-name and
+return the file-name or nil if it did not create the file.  The
+file file-name will not exist when the function is called.
+
+The functions in the list will be called until one returns non-nil, meaning it actually created a file."
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type 'hook)
+
 (defvar annals-active-task-id nil
   "The currently active task id")
 
@@ -196,7 +207,9 @@ URL is the REST URL to call."
 
 
 (defun annals-jira-create-file (task-id file-name)
-  "Create the note file for the task.  Pull information from Jira if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a Jira issue or nil."
+  "Create the note file for the task.  Pull information from Jira
+if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a
+Jira issue or nil."
   (let* ((jira-issue (annals-jira task-id))
 	 (jira-summary (annals-jira-summary jira-issue))
 	 (title (when jira-summary 
@@ -260,7 +273,7 @@ URL is the REST URL to call."
 	(desktop-full-name (desktop-full-file-name full-name)))
    (if (file-readable-p desktop-full-name)
        (annals-task (file-name-nondirectory (directory-file-name full-name)))
-     (message "Not an annuls dir"))))
+     (message "Not an annals dir"))))
 
 (defun annals-dired-archive () 
  "In Dired, archive  the thing at point, if it is a task."
@@ -269,7 +282,7 @@ URL is the REST URL to call."
 	(desktop-full-name (desktop-full-file-name full-name)))
    (if (file-readable-p desktop-full-name)
        (annals-archive (file-name-nondirectory (directory-file-name full-name)))
-     (message "Not an annuls dir"))))
+     (message "Not an annals dir"))))
 
 (defun annals-dired-info ()
   "Show a short description of the task."
@@ -327,9 +340,6 @@ user to enter a new task id"
 	 (key (completing-read prompt  tasks nil 'confirm))
 	 (val (cdr (assoc key tasks))))
     (or val (if (= 0 (length key)) annals-active-task-id key))))
-
-
-
 
 
 (defun annals-task-directory (task-id)
@@ -390,6 +400,9 @@ Example:
 
 
 (defun annals-compare-directories (d1 d2)
+  "Check 2 directories for equality.  They are equal when they
+expand to the same directory.  Logically, a file created in D1
+will be visible in D2."
   (string= (file-name-as-directory d1) 
 	   (file-name-as-directory d2)))
 
@@ -412,8 +425,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 	 (desktop-save-mode t)
 	 (annal-file (expand-file-name (annals-file-name-default task-id) full-dir)))
     (unless (and (boundp 'desktop-dirname) desktop-dirname full-dir
-		 (string= (file-name-as-directory desktop-dirname) 
-			  (file-name-as-directory full-dir)))
+		 (annals-compare-directories desktop-dirname full-dir))
       (annals-suspend)
       (unless (file-directory-p full-dir)
 	(make-directory full-dir t))
@@ -422,10 +434,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
       (setq annals-active-task-id task-id
 	    annals-session-stamp (format-time-string "%Y-%m-%d"))
       (unless (file-regular-p annal-file)
-	(or
-	 (annals-jira-create-file task-id annal-file)
-	 (annals-github-create-file task-id annal-file)
-	 (annals-default-create-file task-id annal-file)))
+	(run-hook-with-args-until-success 'annals-create-file-hook task-id annal-file))
       (find-file-other-window annal-file)
       (run-hooks 'annals-task-hook)
       (find-file-other-window full-dir))))
