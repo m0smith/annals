@@ -257,6 +257,7 @@ Jira issue or nil."
       (write-region title "" file-name)
       file-name)))
 
+
 (defun annals-task-id-from-dir (full-name)
   (let ((desktop-full-name (desktop-full-file-name full-name)))
     (when (file-readable-p desktop-full-name)
@@ -291,7 +292,13 @@ Jira issue or nil."
 	 (tasks-alist (annals-list-tasks))
 	 (entry  (rassoc task-id tasks-alist)))
     (when entry (message "%s" (car entry)))))
-    
+
+
+(defun annals-dired-unarchive ()
+  "Move the task to the active directory."
+  (interactive)
+  (let* ((task-id (annals-task-id-from-dir (dired-file-name-at-point))))
+    (annals-unarchive task-id)))
 
 
 (define-minor-mode annals-dired-mode
@@ -316,14 +323,42 @@ See the command \\[annals-dired-task]."
    )
  :group 'annals)
 
+(define-minor-mode annals-dired-archive-mode
+  "Toggle Annals-Dired-Archive mode.
+Interactively with no argument, this command toggles the mode.
+A positive prefix argument enables the mode, any other prefix
+argument disables it.  From Lisp, argument omitted or nil enables
+the mode, `toggle' toggles the state.
+
+When Annals-Dired mode is enabled, the control delete key
+gobbles all preceding whitespace except the last.
+See the command \\[annals-dired-unarchive]."
+ ;; The initial value.
+ nil
+ ;; The indicator for the mode line.
+ ""
+ ;; The minor mode bindings.
+ '(
+   ((kbd "|z") . annals-dired-unarchive)
+   ((kbd "|i") . annals-dired-info)
+   )
+ :group 'annals)
+
 (defun annals-dired-mode-activate ()
   "Hook run as part of `dired-mode-hook' to activate `annals-dired-mode' for the annals directory."
   (when (annals-compare-directories default-directory annals-active-directory)
-    (message "activating")
     (annals-dired-mode)))
 
+
+(defun annals-dired-archive-mode-activate ()
+  "Hook run as part of `dired-mode-hook' to activate `annals-dired-archvie-mode' for the annals directory."
+  (when (annals-compare-directories default-directory annals-archive-directory)
+    (annals-dired-archive-mode)))
+
 (eval-after-load 'dired
-  (add-hook 'dired-mode-hook 'annals-dired-mode-activate))
+  '(progn
+     (add-hook 'dired-mode-hook 'annals-dired-mode-activate)
+     (add-hook 'dired-mode-hook 'annals-dired-archive-mode-activate)))
 
 
 (defun annals-default-create-file (task-id file-name)
@@ -455,6 +490,14 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (make-directory (expand-file-name annals-archive-directory) t)
   (rename-file (expand-file-name task-id annals-active-directory)
 	       (expand-file-name task-id annals-archive-directory)))
+
+
+(defun annals-unarchive (task-id)
+  "Restore task id TASK-ID.  It  moves the task to the active dir `annals-active-directory'."
+  (annals-checkpoint)
+  
+  (rename-file (expand-file-name task-id annals-archive-directory)
+	       (expand-file-name task-id annals-active-directory)))
 
 (defun annals-checkpoint ()
   "Save the current state and keep it active"
