@@ -38,6 +38,8 @@
 
 ;;; Customization:
 
+(require 'desktop)
+
 (defgroup annals nil
   "EMACS task based session manager and developer notebook"
   :prefix "annals-"
@@ -242,6 +244,11 @@ URL is the REST URL to call."
       (write-region title "" file-name)
       file-name)))
 
+(defun annals-task-id-from-dir (full-name)
+  (let ((desktop-full-name (desktop-full-file-name full-name)))
+    (when (file-readable-p desktop-full-name)
+        (file-name-nondirectory (directory-file-name full-name)))))
+
 ;;;
 ;;; dired minor mode
 ;;;
@@ -264,6 +271,15 @@ URL is the REST URL to call."
        (annals-archive (file-name-nondirectory (directory-file-name full-name)))
      (message "Not an annuls dir"))))
 
+(defun annals-dired-info ()
+  "Show a short description of the task."
+  (interactive)
+  (let* ((task-id (annals-task-id-from-dir (dired-file-name-at-point)))
+	 (tasks-alist (annals-list-tasks))
+	 (entry  (rassoc task-id tasks-alist)))
+    (when entry (message "%s" (car entry)))))
+    
+
 
 (define-minor-mode annals-dired-mode
   "Toggle Annals-Dired mode.
@@ -283,8 +299,18 @@ See the command \\[annals-dired-task]."
  '(
    ((kbd "|a") . annals-dired-task)
    ((kbd "|z") . annals-dired-archive)
-)
+   ((kbd "|i") . annals-dired-info)
+   )
  :group 'annals)
+
+(defun annals-dired-mode-activate ()
+  "Hook run as part of `dired-mode-hook' to activate `annals-dired-mode' for the annals directory."
+  (when (annals-compare-directories default-directory annals-active-directory)
+    (message "activating")
+    (annals-dired-mode)))
+
+(eval-after-load 'dired
+  (add-hook 'dired-mode-hook 'annals-dired-mode-activate))
 
 
 (defun annals-default-create-file (task-id file-name)
@@ -363,7 +389,9 @@ Example:
 		  (annals-buffer-name-counter-next)))))
 
 
-
+(defun annals-compare-directories (d1 d2)
+  (string= (file-name-as-directory d1) 
+	   (file-name-as-directory d2)))
 
 
 ;;;###autoload
