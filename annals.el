@@ -100,7 +100,10 @@
   for saving to this name when `annals-checkpoint' is called.")
 
 (defvar annals-buffer-name-counter 1)
-(add-to-list 'desktop-globals-to-save 'annals-buffer-name-counter)
+
+(eval-after-load "desktop"
+  '(progn
+     (add-to-list 'desktop-globals-to-save 'annals-buffer-name-counter)))
 
 ;;; Code:
 
@@ -239,6 +242,51 @@ URL is the REST URL to call."
       (write-region title "" file-name)
       file-name)))
 
+;;;
+;;; dired minor mode
+;;;
+
+(defun annals-dired-task () 
+ "In Dired, make the thing at point the active task, if it is a task."
+ (interactive)
+ (let* ((full-name (dired-file-name-at-point))
+	(desktop-full-name (desktop-full-file-name full-name)))
+   (if (file-readable-p desktop-full-name)
+       (annals-task (file-name-nondirectory (directory-file-name full-name)))
+     (message "Not an annuls dir"))))
+
+(defun annals-dired-archive () 
+ "In Dired, archive  the thing at point, if it is a task."
+ (interactive)
+ (let* ((full-name (dired-file-name-at-point))
+	(desktop-full-name (desktop-full-file-name full-name)))
+   (if (file-readable-p desktop-full-name)
+       (annals-archive (file-name-nondirectory (directory-file-name full-name)))
+     (message "Not an annuls dir"))))
+
+
+(define-minor-mode annals-dired-mode
+  "Toggle Annals-Dired mode.
+Interactively with no argument, this command toggles the mode.
+A positive prefix argument enables the mode, any other prefix
+argument disables it.  From Lisp, argument omitted or nil enables
+the mode, `toggle' toggles the state.
+
+When Annals-Dired mode is enabled, the control delete key
+gobbles all preceding whitespace except the last.
+See the command \\[annals-dired-task]."
+ ;; The initial value.
+ nil
+ ;; The indicator for the mode line.
+ ""
+ ;; The minor mode bindings.
+ '(
+   ((kbd "|a") . annals-dired-task)
+   ((kbd "|z") . annals-dired-archive)
+)
+ :group 'annals)
+
+
 (defun annals-default-create-file (task-id file-name)
     (when task-id 
       (write-region (format "* %s\n\n" task-id)  "" file-name)
@@ -253,6 +301,9 @@ user to enter a new task id"
 	 (key (completing-read prompt  tasks nil 'confirm))
 	 (val (cdr (assoc key tasks))))
     (or val (if (= 0 (length key)) annals-active-task-id key))))
+
+
+
 
 
 (defun annals-task-directory (task-id)
@@ -312,6 +363,9 @@ Example:
 		  (annals-buffer-name-counter-next)))))
 
 
+
+
+
 ;;;###autoload
 (defun annals-task (task-id)
   "Start a new task is TASK-ID as the `desktop-dirname'.  This closes
@@ -330,12 +384,13 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 	 (desktop-save-mode t)
 	 (annal-file (expand-file-name (annals-file-name-default task-id) full-dir)))
     (unless (and (boundp 'desktop-dirname) desktop-dirname full-dir
-	     (string= (file-name-as-directory desktop-dirname) 
-		      (file-name-as-directory full-dir)))
+		 (string= (file-name-as-directory desktop-dirname) 
+			  (file-name-as-directory full-dir)))
       (annals-suspend)
       (unless (file-directory-p full-dir)
 	(make-directory full-dir t))
-      (desktop-read full-dir)
+      (ignore-errors
+	(desktop-read full-dir))
       (setq annals-active-task-id task-id
 	    annals-session-stamp (format-time-string "%Y-%m-%d"))
       (unless (file-regular-p annal-file)
