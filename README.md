@@ -75,3 +75,11 @@ When in dired-mode for the `annals-archive-directory` (default ~/annals/.archive
 `annals-task-hook` Run after the task has been initialized or switched.  The current task id will be in the variable `annals-active-task-id`.
 
 `annals-create-file-hook` Run when the annals.org file needs to be created for a task.   The function should accept 2 parameters: task-id and file-name and return the file-name or nil if it did not create the file.  The file file-name will not exist when the function is called. The functions in the list will be called until one returns non-nil, meaning it actually created a file.
+
+## Jira Integration
+
+If the task id looks like a Jira ID (letters-digits) and `annals-jira-server` is set to the URL of a jira server, then annals.org will have a link to the Jira issue and will also pull in the issue summary.
+
+## Github Integration
+
+If the task id looks like a Jira ID (repo-project-digits like m0smith-annals-1) and `annals-github-api-server` is set to the URL of the ([Github API server](https://developer.github.com/v3/)), then annals.org will have a link to the Github issue and will also pull in the issue summary.
