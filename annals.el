@@ -264,8 +264,10 @@ URL is the REST URL to call."
 	(let ((start (progn (beginning-of-line) (point)))
 	      (end (progn (end-of-line) (point))))
 	  (goto-char start)
-	  (search-forward "]]" end t)
-	  (concat task-id " " (buffer-substring (point) end)))))))
+	  (re-search-forward "#[+][A-Za-z_]+:" end t) ;; skip org mode stuff
+	  (if (search-forward "]]" end t)
+	      (concat task-id " " (buffer-substring (point) end))
+	    (buffer-substring (point) end)))))))
 
 
 (defun annals-list-tasks ()
@@ -319,7 +321,8 @@ Jira issue or nil."
   (let* ((jira-issue (annals-jira task-id))
 	 (jira-summary (annals-jira-summary jira-issue))
 	 (title (when jira-summary 
-		    (format "* [[%s][%s]] %s\n\n" (annals-jira-browse-url task-id) task-id jira-summary) )))
+		    (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n" task-id jira-summary 
+			    (annals-jira-browse-url task-id) task-id jira-summary) )))
 		  
     (when title 
       (write-region title "" file-name)
@@ -357,7 +360,8 @@ Jira issue or nil."
 	 (github-summary (annals-jira-attribute github-issue 'title))
 	 (github-url (annals-jira-attribute github-issue 'html_url))
 	 (title (when github-summary 
-		    (format "* [[%s][%s]] %s\n\n" github-url task-id github-summary) )))
+		    (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n" task-id github-summary
+			    github-url task-id github-summary) )))
 		  
     (when title 
       (write-region title "" file-name)
@@ -469,7 +473,7 @@ See the command \\[annals-dired-unarchive]."
 
 (defun annals-default-create-file (task-id file-name)
     (when task-id 
-      (write-region (format "* %s\n\n" task-id)  "" file-name)
+      (write-region (format "#+TITLE: %s \n\n* %s\n\n" task-id task-id)  "" file-name)
       file-name))
 
 (defun annals-read-task-id ()
@@ -535,7 +539,7 @@ Example:
   (with-current-buffer (or buffer (current-buffer))
     (setq annals-buffer-name
 	  (format "%s.%d"
-		  (replace-regexp-in-string "[*]" "" 
+		  (replace-regexp-in-string "[*]\\|#[+]TITLE:" "" 
 					    (replace-regexp-in-string "[: ]" "-" (buffer-name)))
 		  (annals-buffer-name-counter-next)))))
 
