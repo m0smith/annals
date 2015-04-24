@@ -83,3 +83,7 @@ If the task id looks like a Jira ID (letters-digits) and `annals-jira-server` is
 ## Github Integration
 
 If the task id looks like a Jira ID (repo-project-digits like m0smith-annals-1) and `annals-github-api-server` is set to the URL of the ([Github API server](https://developer.github.com/v3/)), then annals.org will have a link to the Github issue and will also pull in the issue summary.
+
+## Contributing
+
+If you have ideas or find problem, please create an issue on github.  Pull requests accepted.
