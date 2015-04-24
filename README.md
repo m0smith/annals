@@ -1,5 +1,5 @@
 # annals
-EMACS task based session manager and developer notebook
+EMACS task based session manager and developer notebook with ideas similar to ([mylyn](http://www.eclipse.org/mylyn/)) for eclipse.
 
 When working in a task, such as a Jira issue, it would be nice to keep the state of EMACS, including non-file buffers like \*shell\*.  EMACS desktop.el already does this.  In addition, I would like to:
 - Optionally save the contents of earmuff buffers (\*shell\*, \*grep\*, etc), keeping a version per session ([gh-1](https://github.com/m0smith/annals/issues/1)) (`annals-buffer-name-create`)
