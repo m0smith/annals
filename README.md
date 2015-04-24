@@ -25,6 +25,12 @@ Add to your `.emacs`:
 (global-set-key [C-f6] (quote annals-buffer-name-create))
 ```
 
+To automatically have a type of non-file buffer associated with the current task, add `annals-buffer-name-create` to the mode hook like:
+
+```
+(add-hook 'sql-login-hook 'annals-buffer-name-create)
+```
+
 ## Basic Tasks
 
 Start a new task (`annals-task`)
