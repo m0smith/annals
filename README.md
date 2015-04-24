@@ -51,7 +51,7 @@ Archive a task (`annals-archive`)
 
 Save the state of active tasks and keep them all active (`annals-checkpoint`)
 
-> Same as `desktop-save` on all the active tasks.  In addition, save the associated non-file buffers.
+> Same as `desktop-save` on all the active tasks.  In addition, save the associated non-file buffers.  Running `annals-task` without changing the task will also perform a checkpoint.
 
 Associate a non-file buffer to be saved as part of the annal (`annals-buffer-name-create`)
 
