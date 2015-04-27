@@ -264,8 +264,9 @@ URL is the REST URL to call."
 	(let ((start (progn (beginning-of-line) (point)))
 	      (end (progn (end-of-line) (point))))
 	  (goto-char start)
-	  (re-search-forward "#[+][A-Za-z_]+:" end t) ;; skip org mode stuff
-	  (if (search-forward "]]" end t)
+	  (re-search-forward "[*] *" end t) ;; Skip a leading star(*)
+	  (re-search-forward "#[+][A-Za-z_]+: *" end t) ;; skip org mode stuff
+	  (if (re-search-forward "]] *" end t)
 	      (concat task-id " " (buffer-substring (point) end))
 	    (buffer-substring (point) end)))))))
 
