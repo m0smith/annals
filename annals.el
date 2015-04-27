@@ -622,8 +622,10 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-suspend ()
   "Save the active desktop and turn off the annals feature."
   (interactive)
+  (annals-checkpoint)
   (when (and (boundp 'desktop-dirname) desktop-dirname)
-    (desktop-save desktop-dirname t)
+    ;(desktop-save desktop-dirname t)
+    (desktop-clear)
     (setq annals-active-task-id nil
 	  annals-session-stamp nil
 	  annals-buffer-name-counter 1
