@@ -7,7 +7,7 @@
 ;;     Matthew Smith <matt@m0smith.com>
 ;; URL: http://www.github.com/m0smith/annals
 ;; Version: 0.0.1
-;; Package-Requires: (())
+;; Package-Requires: ((dash "2.12.1"))
 ;; Keywords: task, notebook, jira, mylyn
 
 ;;; License:
