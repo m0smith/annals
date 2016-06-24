@@ -57,7 +57,7 @@ Associate a non-file buffer to be saved as part of the annal (`annals-buffer-nam
 
 Open the directory of the current buffer in the OS (`annals-browse-file-directory`)
 
-> It is often good to interact with the same folders in the OS as in EMACS.  This is a convienince function that will open the `default-directory` of the current buffer in something like Finde on Mac or Explorer in Windows
+> It is often good to interact with the same folders in the OS as in EMACS.  This is a convienince function that will open the `default-directory` of the current buffer in something like Finder on Mac or Explorer in Windows
  
 List the heading marked as :project: (`annals-projects`)
 
