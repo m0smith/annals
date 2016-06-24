@@ -631,6 +631,20 @@ It also moves the task to the archive dir `annals-archive-directory'.
 	  annals-buffer-name-counter 1
 	  desktop-dirname nil)))
 
+;;;###autoload
+(defun annals-browse-file-directory ()
+  "Open the current file's directory however the OS would."
+  (interactive)
+  (if default-directory
+      (browse-url-of-file (expand-file-name default-directory))
+    (error "No `default-directory' to open")))
+
+;;;###autoload
+(defun annals-projects ()
+  "Go through the annals and find all headings tagged with :project:"
+  (interactive)
+  (let ((org-agenda-files (find-lisp-find-files "~/annals" "\\.org$")))
+    (org-tags-view nil "project")))
 
 (add-hook 'desktop-no-desktop-file-hook 
 	  (lambda ()
