@@ -145,6 +145,8 @@
 ;;; Customization:
 
 (require 'desktop)
+(require 'find-lisp)
+(require 'org-capture)
 
 (defgroup annals nil
   "EMACS task based session manager and developer notebook"
@@ -206,6 +208,12 @@ The functions in the list will be called until one returns non-nil, meaning it a
   :group 'annals
   :package-version '(annals . "1.0")
   :type 'hook)
+
+(defcustom annals-ics2org-exec  (expand-file-name "~/bin/ics2org")
+  ""
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type '(file :must-match t))
 
 (defvar annals-active-task-id nil
   "The currently active task id")
@@ -431,6 +439,7 @@ See the command \\[annals-dired-task]."
    ((kbd "|a") . annals-dired-task)
    ((kbd "|z") . annals-dired-archive)
    ((kbd "|i") . annals-dired-info)
+   ((kbd "|^") . annals-browse-file-directory)
    )
  :group 'annals)
 
@@ -643,12 +652,86 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-projects ()
   "Go through the annals and find all headings tagged with :project:"
   (interactive)
-  (let ((org-agenda-files (find-lisp-find-files "~/annals" "\\.org$")))
-    (org-tags-view nil "project")))
+  (make-local-variable 'org-agenda-files)
+  (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$")))
+    (org-todo-list)
+    (setq org-agenda-files org-agenda-files)))
+
+;;;###autoload
+(defun annals-contacts ()
+  "Go through the annals and find all headings tagged with :project:"
+  (interactive)
+  (make-local-variable 'org-agenda-files)
+  (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$")))
+    (org-search-view)
+    (setq org-agenda-files org-agenda-files))) 
+    ;;(org-tags-view nil "project")))
+
+;;;###autoload
+(defun annals-gnus-group (dir)
+  "Go through the annals and make a gnus group"
+  (interactive "DDir w/ EML files: ")
+  (gnus)
+  (let ((eml-files (find-lisp-find-files dir "\\.eml$")))
+    (mapc #'(lambda (x) (gnus-group-make-doc-group x nil)) eml-files)))
+  
+(defun annals-capture ()
+  "Use the `org-capture` function to add a note to the current file"
+  (interactive)
+  (let ((org-default-notes-file buffer-file-name))
+    (org-capture)))
+
+(defun annals-add-meeting-template (annals-file template template-alist)
+  (cons (list "x" "Meeting from ICS" 'entry
+	 (list 'file+headline annals-file "Meetings")
+	 template) template-alist))
+
+
+(defun annals-capture-ics-attendee ()
+  "Parse the ATTENDEE line and return a string [[email][name]]"
+  (interactive)
+  (save-excursion
+    (let* ((bol (progn (forward-line 0) (point)))
+	   (eol (progn (end-of-line) (point)))
+	   (line (replace-regexp-in-string "[\n\r]$" "" (buffer-substring-no-properties bol eol)))
+	   (parts (split-string line ";"))
+	   (parts-alist (-map (lambda (x) (split-string x "="))(-drop 1 parts)))
+	   (mailto (car (last (split-string  (cadr (assoc "PARTSTAT" parts-alist)) ":"))))
+	   (rtnval (format "[[mailto:%s][%s]]" mailto
+			   (replace-regexp-in-string "[\"]" "" (second (assoc "CN" parts-alist) )))))
+      (delete-region bol eol)
+      (goto-char bol)
+      (insert rtnval)
+      rtnval)))
+
+(defun annals-capture-ics-attendee-hook ()
+  "A hook for org-ctrl-c-ctrl-c-hook to convert an ATTENDEE line from an ICS file to a Org mode mailto link"
+  (save-excursion
+    (let* ((bol (progn (forward-line 0) (point))))
+      (goto-char bol)
+      (when (string-equal "ATTENDEE" (current-word))
+	(annals-capture-ics-attendee)))))
+
+
+
+
+(defun annals-capture-ics (file)
+  "Reformat a .ics file and add it to annals.org"
+  (interactive "fICS file:")
+  
+  (let* ((temp-org-file (make-temp-file "cal" nil ".org"))
+	 (template (shell-command-to-string (format "%s '%s' -" annals-ics2org-exec (expand-file-name file)))))
+    (setq org-capture-templates (annals-add-meeting-template (buffer-file-name)
+							     (format "* Meeting\n\n%s" template)
+							     org-capture-templates))
+    (org-capture nil "x")))
+
 
 (add-hook 'desktop-no-desktop-file-hook 
 	  (lambda ()
 	    (setq annals-buffer-name-counter 1)))
+
+(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
 
 (provide 'annals)
 
