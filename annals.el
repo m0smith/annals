@@ -728,14 +728,15 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (org-capture nil "x")))
 
 
-(defun annals-current-word-region ()
-"Get the start and end point of the current word.  Returns a list of 3 element (current-word start end)"
+(defun annals-current-word-region (&optional syntaxes)
+  "Get the start and end point of the current word.  Returns a list of 3 element (current-word start end)"
+  
   (save-excursion
-    (let* ((oldpoint (point)) (start (point)) (end (point))
-	   (syntaxes "w_")
+    (let* ((syntaxes (or syntaxes "w_"))
+	   (oldpoint (point)) (start (point)) (end (point))
            (start (progn (skip-syntax-backward syntaxes) (point)))
            (end (progn (goto-char oldpoint)       (skip-syntax-forward syntaxes)  (point))))
-       (list (current-word) start end))))
+       (list (buffer-substring-no-properties  start end) start end))))
 
 (defun annals-jira-to-link (task-id start end)
 "If TASK-ID is a Jira issue ID, convert it to an org link"
@@ -751,6 +752,26 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (interactive)
   (apply 'annals-jira-to-link  (annals-current-word-region)))
 
+(defun annals-name-from-email (email)
+  "Given an email, return the name assuming the email is formatted like joe.biggs@email.com.  Returns \"Joe Biggs\"."
+  (let ((parts (split-string email "@")))
+    (when (= 2 (length parts))
+      (capitalize (replace-regexp-in-string "[.]" " " (car parts))))))
+
+(defun annals-email-to-link (email start end)
+"If EMAIL is an email looking thing, convert it to an org-mode link"
+ (let ((name (annals-name-from-email email)))
+   (when name
+     (goto-char start)
+     (delete-region start end)
+     (insert (format "[[mailto:%s][%s]]" email name))
+     name)))
+
+(defun annals-email-to-link-hook ()
+  "If the cursor is on an email address, convert it to an org mode link."
+  (interactive)
+  (apply 'annals-email-to-link  (annals-current-word-region "w_.")))
+
 
 (add-hook 'desktop-no-desktop-file-hook 
 	  (lambda ()
@@ -759,6 +780,8 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
 
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
+
+(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
 
 (provide 'annals)
 
