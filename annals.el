@@ -649,13 +649,14 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (error "No `default-directory' to open")))
 
 ;;;###autoload
-(defun annals-projects ()
-  "Go through the annals and find all headings tagged with :project:"
+(defun annals-agenda ()
+  "Go through all the annals and find all the active TODO items (`org-todo-kggeywords`)."
   (interactive)
   (make-local-variable 'org-agenda-files)
-  (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$")))
+  (let ((org-agenda-files* (find-lisp-find-files annals-active-directory "\\.org$")))
+    (setq org-agenda-files org-agenda-files*)
     (org-todo-list)
-    (setq org-agenda-files org-agenda-files)))
+    (setq org-agenda-files org-agenda-files*)))
 
 ;;;###autoload
 (defun annals-contacts ()
@@ -678,8 +679,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-capture ()
   "Use the `org-capture` function to add a note to the current file"
   (interactive)
-  (let ((org-default-notes-file buffer-file-name))
-    (org-capture)))
+  (org-capture 0))
 
 (defun annals-add-meeting-template (annals-file template template-alist)
   (cons (list "x" "Meeting from ICS" 'entry
@@ -702,6 +702,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
       (delete-region bol eol)
       (goto-char bol)
       (insert rtnval)
+      (next-line)
       rtnval)))
 
 (defun annals-capture-ics-attendee-hook ()
@@ -727,11 +728,37 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (org-capture nil "x")))
 
 
+(defun annals-current-word-region ()
+"Get the start and end point of the current word.  Returns a list of 3 element (current-word start end)"
+  (save-excursion
+    (let* ((oldpoint (point)) (start (point)) (end (point))
+	   (syntaxes "w_")
+           (start (progn (skip-syntax-backward syntaxes) (point)))
+           (end (progn (goto-char oldpoint)       (skip-syntax-forward syntaxes)  (point))))
+       (list (current-word) start end))))
+
+(defun annals-jira-to-link (task-id start end)
+"If TASK-ID is a Jira issue ID, convert it to an org link"
+ (let ((url (annals-jira-browse-url task-id)))
+   (when url
+     (goto-char start)
+     (delete-region start end)
+     (insert (format "[[%s][%s]]" url task-id))
+     url)))
+
+(defun annals-task-id-to-link-hook ()
+  "If the cursor is on a Jira task id, convert it to an org mode link."
+  (interactive)
+  (apply 'annals-jira-to-link  (annals-current-word-region)))
+
+
 (add-hook 'desktop-no-desktop-file-hook 
 	  (lambda ()
 	    (setq annals-buffer-name-counter 1)))
 
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
+
+(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
 
 (provide 'annals)
 
