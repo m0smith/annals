@@ -658,15 +658,6 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (org-todo-list)
     (setq org-agenda-files org-agenda-files*)))
 
-;;;###autoload
-(defun annals-contacts ()
-  "Go through the annals and find all headings tagged with :project:"
-  (interactive)
-  (make-local-variable 'org-agenda-files)
-  (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$")))
-    (org-search-view)
-    (setq org-agenda-files org-agenda-files))) 
-    ;;(org-tags-view nil "project")))
 
 ;;;###autoload
 (defun annals-gnus-group (dir)
@@ -728,6 +719,68 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (org-capture nil "x")))
 
 
+
+(defun annals-contacts-from-org (file)
+  "Get the contacts from the file.  Contacts are links with a mailto: protocol.  Returns a list with (name email)"
+  (interactive "fannals file:")
+  (let* ((org-startup-folded nil)
+	 (org-startup-align-all-tables nil)
+	 (buffer (if (file-exists-p file)
+		     (org-get-agenda-file-buffer file)
+		   (error "No such file %s" file)))
+	 arg results rtn deadline-results)
+    (if (not buffer)
+	;; If file does not exist, make sure an error message ends up in diary
+	(list (format "ANNALS-ERROR: No such org-file %s" file))
+      (with-current-buffer buffer
+	(unless (derived-mode-p 'org-mode)
+	  (error "Annals file %s is not in `org-mode'" file))
+	(setq org-agenda-buffer (or org-agenda-buffer buffer))
+	(let ((case-fold-search nil))
+	  (save-excursion
+	    (save-restriction
+	      (if (eq buffer org-agenda-restrict)
+		  (narrow-to-region org-agenda-restrict-begin
+				    org-agenda-restrict-end)
+		(widen))
+	      ;; The way we repeatedly append to `results' makes it O(n^2) :-(
+	      (goto-char (point-min))
+	      (while (search-forward-regexp "\\[\\[mailto:\\([^]]*\\)\\]\\[\\([^]]*\\)\\]\\]" nil t)
+		(add-to-list 'results (list (replace-regexp-in-string " +" " "
+								      (buffer-substring-no-properties (match-beginning 2) (match-end 2)))
+					    (buffer-substring-no-properties (match-beginning 1) (match-end 1)))))
+
+	      results)))))))
+
+;;;###autoload
+(defun annals-contacts ()
+  "Go through the annals and find all contacts.  Return as a list of (name email) pairs."
+  (interactive)
+  (make-local-variable 'org-agenda-files)
+  (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$"))
+	rtvnal)
+    (setq rtnval (list))
+    (dolist (contact  (-flatten-n 1 (mapcar 'annals-contacts-from-org org-agenda-files)) rtnval)
+      (add-to-list 'rtnval contact))))
+
+(defun annals-contact-key (p)
+  (list (format "%s <%s>" (first p) (second p))
+	(first p) (second p)))
+
+(defun annals-contact-insert ()
+  "Get a list of contacts from the annals and pick one from the list to insert."
+  (interactive)
+  (let* ((coll (mapcar 'annals-contact-key (annals-contacts)))
+	 (key (completing-read "Select contact: " coll)))
+    (when key
+      (let ((sel (assoc key coll)))
+	(insert 
+	 (if sel
+	     (format "[[mailto:%s][%s]]" (nth 2 sel) (nth 1 sel))
+	   key))
+	key))))
+
+
 (defun annals-current-word-region (&optional syntaxes)
   "Get the start and end point of the current word.  Returns a list of 3 element (current-word start end)"
   
@@ -753,9 +806,10 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (apply 'annals-jira-to-link  (annals-current-word-region)))
 
 (defun annals-name-from-email (email)
-  "Given an email, return the name assuming the email is formatted like joe.biggs@email.com.  Returns \"Joe Biggs\"."
+  "Given an EMAIL, return the name assuming the email is formatted like joe.biggs@email.com.  Returns \"Joe Biggs\"."
   (let ((parts (split-string email "@")))
-    (when (= 2 (length parts))
+    (when (and (= 2 (length parts))
+	       (< 0 (length (first parts))))
       (capitalize (replace-regexp-in-string "[.]" " " (car parts))))))
 
 (defun annals-email-to-link (email start end)
@@ -772,6 +826,19 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (interactive)
   (apply 'annals-email-to-link  (annals-current-word-region "w_.")))
 
+(defun annals-at-to-contact (cw start end)
+  "When looking at an @, remove it and insert a contact."
+  (when (string-equal "@" cw)
+    (delete-region start end)
+    (annals-contact-insert)))
+
+(defun annals-at-to-contact-hook ()
+  "Hook to look for @ and insert a contact"
+  (interactive)
+  (let ((cw (annals-current-word-region)))
+    (apply 'annals-at-to-contact cw)))
+
+
 
 (add-hook 'desktop-no-desktop-file-hook 
 	  (lambda ()
@@ -782,6 +849,8 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
 
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
+
+(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-at-to-contact-hook)
 
 (provide 'annals)
 
