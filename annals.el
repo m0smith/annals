@@ -844,6 +844,8 @@ It also moves the task to the archive dir `annals-archive-directory'.
 	  (lambda ()
 	    (setq annals-buffer-name-counter 1)))
 
+;; C-c C-c
+
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
 
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
@@ -851,6 +853,18 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
 
 (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-at-to-contact-hook)
+
+;; TAB
+
+(add-hook 'org-tab-before-tab-emulation-hook 'annals-capture-ics-attendee-hook)
+
+(add-hook 'org-tab-before-tab-emulation-hook 'annals-task-id-to-link-hook)
+
+(add-hook 'org-tab-before-tab-emulation-hook 'annals-email-to-link-hook)
+
+(add-hook 'org-tab-before-tab-emulation-hook 'annals-at-to-contact-hook)
+
+
 
 (provide 'annals)
 
