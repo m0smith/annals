@@ -666,6 +666,15 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (gnus)
   (let ((eml-files (find-lisp-find-files dir "\\.eml$")))
     (mapc #'(lambda (x) (gnus-group-make-doc-group x nil)) eml-files)))
+
+(defun annals-gnus-eml ()
+  (let* ((eml-file (buffer-file-name))
+	 (nname (format "nndoc+%s:%s" eml-file (buffer-name))))
+    (kill-buffer)
+    (gnus)
+    (unless (gnus-group-entry nname)
+      (gnus-group-make-doc-group eml-file nil))
+    (gnus-group-read-group nil t nname)))
   
 (defun annals-capture ()
   "Use the `org-capture` function to add a note to the current file"
@@ -864,7 +873,9 @@ It also moves the task to the archive dir `annals-archive-directory'.
 
 (add-hook 'org-tab-before-tab-emulation-hook 'annals-at-to-contact-hook)
 
+;; EML
 
+(add-to-list 'auto-mode-alist '("\\.eml\\'" . annals-gnus-eml))
 
 (provide 'annals)
 
