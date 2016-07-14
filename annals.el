@@ -679,6 +679,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-capture ()
   "Use the `org-capture` function to add a note to the current file"
   (interactive)
+  
   (org-capture 0))
 
 (defun annals-add-meeting-template (annals-file template template-alist)
@@ -686,6 +687,32 @@ It also moves the task to the archive dir `annals-archive-directory'.
 	 (list 'file+headline annals-file "Meetings")
 	 template) template-alist))
 
+(defun annals-project-dirs (&optional dir)
+  "Return the list of project directories, relative to the directory. DIR defaults to `annals-active-directory`"
+  (let (( annals-dirs (find-lisp-find-files-internal (or dir annals-active-directory)
+						     'find-lisp-file-predicate-is-directory
+						     'find-lisp-default-directory-predicate)))
+    (-filter (lambda (d) (not (string-match "/[.]git" d))) annals-dirs)))
+
+    
+
+(defun annals-concat (list-of-strings &optional seperator)
+  "Take a LIST-OF-STRINGS and create a single string.  Place SEPERATOR in between each element."
+  (if seperator
+      (apply 'concat (-interpose seperator list-of-strings))
+    (apply 'concat list-of-strings)))
+
+(defun annals-project-choose (&optional dir)
+  "Give the user a list of projects in DIR and return the folder for the selected project"
+
+  (let* ((project-dir (or dir annals-active-directory))
+	 (projects (mapcar (lambda (d) (-> (file-relative-name d project-dir)
+					  (split-string "/")
+					  reverse
+					  (annals-concat "-")
+					  (list d)))
+			  (annals-project-dirs project-dir))))
+    (second (assoc (completing-read "Select Project:" projects) projects))))
 
 (defun annals-capture-ics-attendee ()
   "Parse the ATTENDEE line and return a string [[email][name]]"
