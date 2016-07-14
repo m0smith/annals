@@ -681,8 +681,9 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-capture ()
   "Use the `org-capture` function to add a note to the current file"
   (interactive)
-  
-  (org-capture 0))
+  (let* ((project-dir (annals-project-choose))
+	 (org-default-notes-file (expand-file-name "annals.org" project-dir)))
+    (org-capture)))
 
 (defun annals-add-meeting-template (annals-file template template-alist)
   (cons (list "x" "Meeting from ICS" 'entry
