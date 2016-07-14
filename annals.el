@@ -660,18 +660,20 @@ It also moves the task to the archive dir `annals-archive-directory'.
 
 
 ;;;###autoload
-(defun annals-gnus-group (dir)
-  "Go through the annals and make a gnus group"
-  (interactive "DDir w/ EML files: ")
-  (gnus)
-  (let ((eml-files (find-lisp-find-files dir "\\.eml$")))
-    (mapc #'(lambda (x) (gnus-group-make-doc-group x nil)) eml-files)))
+(defun annals-gnus-group-old (&optional dir)
+  "DEPrACATED: Go through the annals and make a gnus group"
+  (interactive)
+  (let ((project-dir (or dir (annals-project-choose))))
+    (gnus 1 t)
+    (let ((eml-files (find-lisp-find-files project-dir "\\.eml$")))
+      (mapc #'(lambda (x) (gnus-group-make-doc-group x nil)) eml-files))))
 
 (defun annals-gnus-eml ()
+  "Open an EML file in a GNUS buffer"
   (let* ((eml-file (buffer-file-name))
 	 (nname (format "nndoc+%s:%s" eml-file (buffer-name))))
     (kill-buffer)
-    (gnus)
+    (gnus 1 t)
     (unless (gnus-group-entry nname)
       (gnus-group-make-doc-group eml-file nil))
     (gnus-group-read-group nil t nname)))
@@ -702,17 +704,31 @@ It also moves the task to the archive dir `annals-archive-directory'.
       (apply 'concat (-interpose seperator list-of-strings))
     (apply 'concat list-of-strings)))
 
+(defvar annals-project-choose-history nil)
+  
 (defun annals-project-choose (&optional dir)
-  "Give the user a list of projects in DIR and return the folder for the selected project"
+  "Give the user a list of projects in DIR (default to `annals-active-directory`) and return the folder for the selected project"
 
   (let* ((project-dir (or dir annals-active-directory))
-	 (projects (mapcar (lambda (d) (-> (file-relative-name d project-dir)
-					  (split-string "/")
-					  reverse
-					  (annals-concat "-")
-					  (list d)))
-			  (annals-project-dirs project-dir))))
-    (second (assoc (completing-read "Select Project:" projects) projects))))
+	 (current-dir (expand-file-name (file-name-as-directory default-directory)))
+	 (projects (mapcar (lambda (d)
+			     (let (( def (when (string-equal (expand-file-name (file-name-as-directory d)) current-dir) :default)))
+			       (-> (file-relative-name d project-dir)
+				   (split-string "/")
+				   reverse
+				   (annals-concat "-")
+				   (list d def))))
+			   (annals-project-dirs project-dir)))
+	 (defaults (mapcar 'first (-filter (lambda (p) (eq :default (nth 2 p))) projects)))
+	 (default (or (first defaults) (first (assoc (first annals-project-choose-history) projects))))
+	 (prompt (if default (format "Select Project (default: %s): " default) "Select Project: "))
+	 (choice (completing-read prompt projects nil t nil 'annals-project-choose-history default)))
+    (second (assoc (or choice default) projects))))
+
+(defun annals-project-dired (project-dir)
+  "Open the project directory in dired."
+  (interactive (list (annals-project-choose)))
+  (dired project-dir)))
 
 (defun annals-capture-ics-attendee ()
   "Parse the ATTENDEE line and return a string [[email][name]]"
