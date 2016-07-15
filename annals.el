@@ -209,6 +209,13 @@ The functions in the list will be called until one returns non-nil, meaning it a
   :package-version '(annals . "1.0")
   :type 'hook)
 
+(defcustom annals-task-template-create-hook  (list  'annals-github-create-template )
+  "A list of funtions to call to create a new template based on task-id"
+    :group 'annals
+    :package-version '(annals . "1.0"))
+
+
+
 (defcustom annals-ics2org-exec  (expand-file-name "~/bin/ics2org")
   ""
   :group 'annals
@@ -362,6 +369,30 @@ Jira issue or nil."
     (unless (url-get-authentication url nil 'any t)
       (url-basic-auth (url-generic-parse-url url) t))
     (annals-json-call url)))
+
+(defun annals-github-create-file-template (task-id)
+  "Return a template for a Github issue"
+  
+  (let* ((github-issue (annals-github task-id))
+	 (github-summary (annals-jira-attribute github-issue 'title))
+	 (github-url (annals-jira-attribute github-issue 'html_url))
+	 (title (when github-summary 
+		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n" task-id github-summary
+			  github-url task-id github-summary) )))
+    (when title
+      (format "%s" title))))
+
+(defun annals-github-create-template (task-id)
+  "Return a template for a Github issue"
+  
+  (let* ((github-issue (annals-github task-id))
+	 (github-summary (annals-jira-attribute github-issue 'title))
+	 (github-url (annals-jira-attribute github-issue 'html_url))
+	 (title (when github-summary 
+		  (format "* TASK [[%s][%s]] %s\n\n" github-url task-id github-summary) )))
+    (when title title)))
+
+
 
 (defun annals-github-create-file (task-id file-name)
   "Create the note file for the task.  Pull information from Jira if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a Jira issue or nil."
@@ -594,6 +625,18 @@ If the currently active task is selected, simply call `annals-checkpoint'.
       (run-hooks 'annals-task-hook)
       (find-file-other-window full-dir))))
 
+
+(devar annals-task-template-history nil)
+
+
+;;;###autoload
+(defun annals-task-template ()
+  "Return the template for the given task."
+  (interactive)
+  (let ((task-id (read-from-minibuffer "Task: " nil nil nil 'annals-task-template-history)))
+    (run-hook-with-args-until-success 'annals-task-template-create-hook task-id)))
+  
+
 ;;;###autoload
 (defun annals-archive (task-id)
   "Archive task is TASK-ID.  If the current task is the one being
@@ -679,7 +722,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
     (gnus-group-read-group nil t nname)))
   
 (defun annals-capture ()
-  "Use the `org-capture` function to add a note to the current file"
+  "Use the `org-capture` function to add a note to the chosen project file"
   (interactive)
   (let* ((project-dir (annals-project-choose))
 	 (org-default-notes-file (expand-file-name "annals.org" project-dir)))
@@ -731,6 +774,36 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (interactive (list (annals-project-choose)))
   (dired project-dir)))
 
+(defun annals-project-choose-annal ()
+  "Allow the user to select an annals.org file"
+  (expand-file-name "annals.org" (annals-project-choose)))
+
+(defun annals-update-org-capture-templates(entry)
+  "Add ENTRY to `org-capture-templates` if the key (car entry) is not already in the list.  If it is, replace it."
+  (let ((existing (assoc (car entry) org-capture-templates)))
+    (if existing
+	(setcdr existing (cdr entry))
+      (add-to-list 'org-capture-templates entry))
+    org-capture-templates))
+
+
+(defun xx ( )
+    (interactive)
+
+    (annals-update-org-capture-templates '("t" "Todo" entry
+					   (file+headline nil "Tasks")
+					   "* TODO %?\n  %i\n  %a"))
+
+    (annals-update-org-capture-templates '("c" "Meeting from ICS" entry
+					   (file+headline annals-project-choose-annal "Meetings")
+					   (function annals-capture-ics-template)))
+    
+    (annals-update-org-capture-templates '("i" "Annals Task/Issue internal"  entry
+					   (file+headline  annals-project-choose-annal "Issues")
+					   (function annals-task-template))))
+
+
+
 (defun annals-capture-ics-attendee ()
   "Parse the ATTENDEE line and return a string [[email][name]]"
   (interactive)
@@ -757,21 +830,12 @@ It also moves the task to the archive dir `annals-archive-directory'.
       (when (string-equal "ATTENDEE" (current-word))
 	(annals-capture-ics-attendee)))))
 
+(defun annals-capture-ics-exec (file)
+  (shell-command-to-string (format "%s '%s' -" annals-ics2org-exec (expand-file-name (or file (buffer-file-name))))))
 
-
-
-(defun annals-capture-ics (file)
-  "Reformat a .ics file and add it to annals.org"
-  (interactive "fICS file:")
-  
-  (let* ((temp-org-file (make-temp-file "cal" nil ".org"))
-	 (template (shell-command-to-string (format "%s '%s' -" annals-ics2org-exec (expand-file-name file)))))
-    (setq org-capture-templates (annals-add-meeting-template (buffer-file-name)
-							     (format "* Meeting\n\n%s" template)
-							     org-capture-templates))
-    (org-capture nil "x")))
-
-
+(defun annals-capture-ics-template ()
+  (format "* Meeting\n\n%s"
+	  (annals-capture-ics-exec (read-file-name "ICS File: "))))
 
 (defun annals-contacts-from-org (file)
   "Get the contacts from the file.  Contacts are links with a mailto: protocol.  Returns a list with (name email)"
