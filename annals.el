@@ -626,7 +626,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
       (find-file-other-window full-dir))))
 
 
-(devar annals-task-template-history nil)
+(defvar annals-task-template-history nil)
 
 
 ;;;###autoload
@@ -772,7 +772,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-project-dired (project-dir)
   "Open the project directory in dired."
   (interactive (list (annals-project-choose)))
-  (dired project-dir)))
+  (dired project-dir))
 
 (defun annals-project-choose-annal ()
   "Allow the user to select an annals.org file"
@@ -787,20 +787,23 @@ It also moves the task to the archive dir `annals-archive-directory'.
     org-capture-templates))
 
 
-(defun xx ( )
-    (interactive)
+(defun annals-capture-templates-setup ( )
+  "Add the annals templates to the `org-captur-templates`."
+  (interactive)
 
-    (annals-update-org-capture-templates '("t" "Todo" entry
-					   (file+headline nil "Tasks")
-					   "* TODO %?\n  %i\n  %a"))
+  (annals-update-org-capture-templates '("t" "Todo" entry
+					 (file+headline nil "Tasks")
+					 "* TODO %?\n  %i\n  %a"))
 
-    (annals-update-org-capture-templates '("c" "Meeting from ICS" entry
-					   (file+headline annals-project-choose-annal "Meetings")
-					   (function annals-capture-ics-template)))
+  (annals-update-org-capture-templates '("c" "Meeting from ICS" entry
+					 (file+headline annals-project-choose-annal "Meetings")
+					 (function annals-capture-ics-template)))
     
-    (annals-update-org-capture-templates '("i" "Annals Task/Issue internal"  entry
-					   (file+headline  annals-project-choose-annal "Issues")
-					   (function annals-task-template))))
+  (annals-update-org-capture-templates '("a" "Annals templates"))
+  
+  (annals-update-org-capture-templates '("ai" "Annals Task/Issue to existing project"  entry
+					 (file+headline  annals-project-choose-annal "Issues")
+					 (function annals-task-template))))
 
 
 
@@ -957,33 +960,38 @@ It also moves the task to the archive dir `annals-archive-directory'.
 
 
 
-(add-hook 'desktop-no-desktop-file-hook 
-	  (lambda ()
-	    (setq annals-buffer-name-counter 1)))
+(defun annals-init ()
+  "Startup annals"
 
-;; C-c C-c
+  (add-hook 'desktop-no-desktop-file-hook 
+	    (lambda ()
+	      (setq annals-buffer-name-counter 1)))
 
-(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
+  ;; C-c C-c
+  
+  (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
+  
+  (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
+  
+  (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
+  
+  (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-at-to-contact-hook)
+  
+  ;; TAB
+  
+  (add-hook 'org-tab-before-tab-emulation-hook 'annals-capture-ics-attendee-hook)
+  
+  (add-hook 'org-tab-before-tab-emulation-hook 'annals-task-id-to-link-hook)
+  
+  (add-hook 'org-tab-before-tab-emulation-hook 'annals-email-to-link-hook)
+  
+  (add-hook 'org-tab-before-tab-emulation-hook 'annals-at-to-contact-hook)
+  
+  ;; EML
+  
+  (add-to-list 'auto-mode-alist '("\\.eml\\'" . annals-gnus-eml))
 
-(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
-
-(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
-
-(add-hook 'org-ctrl-c-ctrl-c-hook 'annals-at-to-contact-hook)
-
-;; TAB
-
-(add-hook 'org-tab-before-tab-emulation-hook 'annals-capture-ics-attendee-hook)
-
-(add-hook 'org-tab-before-tab-emulation-hook 'annals-task-id-to-link-hook)
-
-(add-hook 'org-tab-before-tab-emulation-hook 'annals-email-to-link-hook)
-
-(add-hook 'org-tab-before-tab-emulation-hook 'annals-at-to-contact-hook)
-
-;; EML
-
-(add-to-list 'auto-mode-alist '("\\.eml\\'" . annals-gnus-eml))
+  (annals-capture-templates-setup))
 
 (provide 'annals)
 
