@@ -209,7 +209,7 @@ The functions in the list will be called until one returns non-nil, meaning it a
   :package-version '(annals . "1.0")
   :type 'hook)
 
-(defcustom annals-task-template-create-hook  (list  'annals-github-create-template )
+(defcustom annals-task-template-create-hook  (list  'annals-jira-create-template 'annals-github-create-template )
   "A list of funtions to call to create a new template based on task-id"
     :group 'annals
     :package-version '(annals . "1.0"))
@@ -343,6 +343,17 @@ Jira issue or nil."
     (when title 
       (write-region title "" file-name)
       file-name)))
+
+(defun annals-jira-create-template (task-id)
+  "Create the note file for the task.  Pull information from Jira
+if TASK-ID is a Jira issue-id.  Return FILE-NAME if there is a
+Jira issue or nil."
+  (let* ((jira-issue (annals-jira task-id))
+	 (jira-summary (annals-jira-summary jira-issue))
+	 (title (when jira-summary 
+		    (format "* TASK [[%s][%s]] %s\n\n" (annals-jira-browse-url task-id) task-id jira-summary))))
+		  
+    (when title title)))
 
 
 ;;;
