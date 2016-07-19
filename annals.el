@@ -808,7 +808,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
 
   (annals-update-org-capture-templates '("c" "Meeting from ICS" entry
 					 (file+headline annals-project-choose-annal "Meetings")
-					 (function annals-capture-ics-template)))
+					 (function annals-capture-ics-parse))) ;;annals-capture-ics-template)))
     
   (annals-update-org-capture-templates '("a" "Annals templates"))
   
@@ -850,6 +850,129 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-capture-ics-template ()
   (format "* Meeting\n\n%s"
 	  (annals-capture-ics-exec (read-file-name "ICS File: "))))
+
+(defun annals-read-lines (filePath)
+  "Return a list of lines of a file at filePath."
+  (interactive "fFile:")
+  (with-temp-buffer
+    (insert-file-contents filePath)
+    (split-string (buffer-string) "\n" t)))
+
+(defun annals-get-string-from-file (filePath)
+  "Return filePath's file content."
+  (with-temp-buffer
+    (insert-file-contents filePath)
+    (buffer-string)))
+
+
+(defun annals-combine-lines* (pred r l)
+  "When (PRED l) is true, append R (assumed to be a string, to the first element of L.  Otherwise, cons R onto L"
+  (if (funcall pred l)
+      (cons (format "%s%s" (car r) l) (cdr r))
+    (cons l r)))
+
+(defun annals-combine-lines (pred lines)
+  "Pass each element of LINES (expected to be a list of strings)
+to pred.  When true, add current line to the last line.
+Otherwise, append current line to the end of the return list."
+  
+  (reverse (-reduce-from (lambda (rr ll) (annals-combine-lines* pred rr ll))  '() lines)))
+
+(defun annals-combine-linesp (line)
+  (string-match "^[^A-Z]" line))
+
+
+(defun annals-capture-ics-add-to-tree (tree parts-list)
+  "TREE is a nested alist structure.  Return a list of (tree parts-list)"
+  (let* ((pl parts-list)
+	 (tt tree)
+	 (in-loop t))
+    (while (and in-loop pl)
+      (let* ((parts (car pl))
+	     (key (car parts)))
+	(cond
+	 ((string-equal "BEGIN" key)
+	  (let* ((subtree-pl (annals-capture-ics-add-to-tree nil (cdr pl)))
+		 (entry (cons (second parts) (car subtree-pl))))
+	    
+	    (setq tt (if tt (cons entry tt) entry)
+		  pl (second subtree-pl))))
+	 ((string-equal "END" key)
+	  (progn
+	    (setq pl (cdr pl)
+		  in-loop nil)))
+	 (t 
+	  (progn
+	    (setq tt (cons parts tt)
+		  pl (cdr pl)))))))
+    (list tt pl)))
+  
+
+(defun annals-capture-ics-search-tree (tree path)
+  "PATH is the keys to follow through TREE"
+  (let ((subtree (assoc (car path) tree)))
+    (if (cdr path)
+	(when subtree (annals-capture-ics-search-tree subtree (cdr path)))
+      (cdr subtree))))
+
+(defun annals-capture-ics-parse-attendees* (attendee-info)
+  (format "[[%s][%s]]\n" 
+	  (first(last attendee-info))
+	  (replace-regexp-in-string "[\"]" "" (substring (first (-filter (lambda (e) (string-match "^CN=" e)) attendee-info)) 3))))
+
+
+(defun annals-capture-ics-parse-properties (tree)
+  (format ":ID:        %s\n:LOCATION:  %s"
+	  (car (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "UID")))
+	  (car (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "LOCATION")))))
+  
+(defun annals-capture-ics-parse-attendees (tree)
+  "Return a list of attendees"
+  (let ((vevent (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT")))
+	(organizer (second (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "ORGANIZER")))))
+    (cons (format "Organizer: %s\n" organizer)
+	  (-map 'annals-capture-ics-parse-attendees* (-filter (lambda (n) (string-equal "ATTENDEE" (car n))) vevent)))))
+(defun annals-capture-ics-parse-time-iso (time-string)
+  "Expects something like 20160719T110000."
+  (when (string-match "\\([0-9]\\{4\\}\\)\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)T\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)" time-string)
+    (let* ((year (match-string 1 time-string))
+	  (month (match-string 2 time-string))
+	  (day (match-string 3 time-string))
+	  (hour (match-string 4 time-string))
+	  (minute (match-string 5 time-string))
+	  (second (match-string 6 time-string))
+	  (dow (format-time-string "%a" (date-to-time (format "%s-%s-%sT%s:%s:%s" year month day hour minute second))))) 
+      (format "%s-%s-%s %s %s:%s" year month day dow hour minute)))
+     
+  )
+(defun annals-capture-ics-parse-time (tree)
+  (let ((start-time (second (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "DTSTART"))))
+	(end-time (second( annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "DTEND")))))
+    (format "<%s>--<%s>" (annals-capture-ics-parse-time-iso start-time)
+	    (annals-capture-ics-parse-time-iso end-time))))
+
+(defun annals-capture-ics-parse (&optional file-name)
+  "Read an ICS and parse it into a nice org template"
+  (let* ((file (or file-name (read-file-name "ICS File: ")))
+	 (lines (annals-read-lines file))
+	 (combined-lines (annals-combine-lines 'annals-combine-linesp lines))
+	 (parts-list (-map (lambda (l) (split-string l "[;:]")) combined-lines))
+	 (tree (annals-capture-ics-add-to-tree nil parts-list))
+	 (summary (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "SUMMARY")))
+
+	 (description (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "DESCRIPTION")))
+	 (properties (annals-capture-ics-parse-properties tree))
+	 (attendees (annals-capture-ics-parse-attendees tree)))
+    (format "* %s\n%s\n#+DRAWERS:     ICS\n:PROPERTIES:\n%s\n:END:\n:ICS:\n%s\n:END:\n\n** Attendees\n%s\n\n** Agenda\n%s\n** Notes\n"
+	    (car summary)
+	    (annals-capture-ics-parse-time tree)
+	    properties
+	    (annals-get-string-from-file file)
+	    (annals-concat attendees)
+	    (replace-regexp-in-string "[\\]n" "\n" (annals-concat description "\n")))))
+	 
+
+
 
 (defun annals-contacts-from-org (file)
   "Get the contacts from the file.  Contacts are links with a mailto: protocol.  Returns a list with (name email)"
