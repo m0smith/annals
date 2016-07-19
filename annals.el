@@ -953,16 +953,18 @@ Otherwise, append current line to the end of the return list."
 
 (defun annals-capture-ics-parse (&optional file-name)
   "Read an ICS and parse it into a nice org template"
+
   (let* ((file (or file-name (read-file-name "ICS File: ")))
 	 (lines (annals-read-lines file))
 	 (combined-lines (annals-combine-lines 'annals-combine-linesp lines))
 	 (parts-list (-map (lambda (l) (split-string l "[;:]")) combined-lines))
 	 (tree (annals-capture-ics-add-to-tree nil parts-list))
 	 (summary (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "SUMMARY")))
-
 	 (description (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "DESCRIPTION")))
 	 (properties (annals-capture-ics-parse-properties tree))
 	 (attendees (annals-capture-ics-parse-attendees tree)))
+
+    (setq org-capture-plist (plist-put org-capture-plist :ics-file file))
     (format "* %s\n%s\n#+DRAWERS:     ICS\n:PROPERTIES:\n%s\n:END:\n:ICS:\n%s\n:END:\n\n** Attendees\n%s\n\n** Agenda\n%s\n** Notes\n"
 	    (car summary)
 	    (annals-capture-ics-parse-time tree)
@@ -971,7 +973,12 @@ Otherwise, append current line to the end of the return list."
 	    (annals-concat attendees)
 	    (replace-regexp-in-string "[\\]n" "\n" (annals-concat description "\n")))))
 	 
-
+(defun annals-capture-ics-delete-file ()
+  "Look for :ics-file in `org-capture-plist`.  If it is there and
+exists, ask the user permission to delete it.  For use as a hook with `annals-capture-ics-parse` which sets :ics-file."
+  (let ((file (plist-get org-capture-plist :ics-file)))
+    (when (and file (file-readable-p file) (y-or-n-p (format "Delete file: %s?" file)))
+      (delete-file file))))
 
 
 (defun annals-contacts-from-org (file)
@@ -1124,6 +1131,12 @@ Otherwise, append current line to the end of the return list."
   ;; EML
   
   (add-to-list 'auto-mode-alist '("\\.eml\\'" . annals-gnus-eml))
+
+  ;; ICS
+
+  (add-hook 'org-capture-after-finalize-hook 'annals-capture-ics-delete-file)
+
+  ;; Capture
 
   (annals-capture-templates-setup))
 
