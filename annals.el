@@ -881,6 +881,16 @@ Otherwise, append current line to the end of the return list."
 (defun annals-combine-linesp (line)
   (string-match "^[^A-Z]" line))
 
+(defun  annals-capture-ics-buffer-file-name (&optional buffer)
+  "Return the name file name of the BUFFER; ala (`buffer-file-name') if it is visiting an ICS file"
+  (let ((rtnval (buffer-file-name buffer)))
+    (when (string-match "[.]ics$" rtnval)
+      rtnval)))
+
+(defun  annals-capture-ics-mode ()
+  "Not really a mode, but meant to be added to `auto-mode-alist' to capture an ICS file"
+  (org-capture nil "c"))
+
 
 (defun annals-capture-ics-add-to-tree (tree parts-list)
   "TREE is a nested alist structure.  Return a list of (tree parts-list)"
@@ -954,7 +964,9 @@ Otherwise, append current line to the end of the return list."
 (defun annals-capture-ics-parse (&optional file-name)
   "Read an ICS and parse it into a nice org template"
 
-  (let* ((file (or file-name (read-file-name "ICS File: ")))
+  (let* ((file (or file-name
+		   (annals-capture-ics-buffer-file-name)
+		   (read-file-name "ICS File: ")))
 	 (lines (annals-read-lines file))
 	 (combined-lines (annals-combine-lines 'annals-combine-linesp lines))
 	 (parts-list (-map (lambda (l) (split-string l "[;:]")) combined-lines))
@@ -1136,6 +1148,8 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
 
   (add-hook 'org-capture-after-finalize-hook 'annals-capture-ics-delete-file)
 
+  (add-to-list 'auto-mode-alist '("\\.ics\\'" .   annals-capture-ics-mode))
+	       
   ;; Capture
 
   (annals-capture-templates-setup))
