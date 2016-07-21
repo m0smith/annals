@@ -725,12 +725,14 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-gnus-eml ()
   "Open an EML file in a GNUS buffer"
   (let* ((eml-file (buffer-file-name))
-	 (nname (format "nndoc+%s:%s" eml-file (buffer-name))))
-    (kill-buffer)
+	 (nname (format "nndoc+%s:%s" eml-file (buffer-name)))
+	 (eml-buffer (current-buffer)))
     (gnus 1 t)
     (unless (gnus-group-entry nname)
       (gnus-group-make-doc-group eml-file nil))
-    (gnus-group-read-group nil t nname)))
+    (gnus-group-read-group nil t nname)
+    (kill-buffer eml-buffer)))
+
   
 (defun annals-capture ()
   "Use the `org-capture` function to add a note to the chosen project file"
@@ -992,6 +994,10 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
     (when (and file (file-readable-p file) (y-or-n-p (format "Delete file: %s?" file)))
       (delete-file file))))
 
+(defun annals-capture-reveal ()
+  "Use an external program to show a project directory.  Similar to or a replacement for `org-attach-reveal'."
+  (interactive)
+  (org-open-file (annals-project-choose)))
 
 (defun annals-contacts-from-org (file)
   "Get the contacts from the file.  Contacts are links with a mailto: protocol.  Returns a list with (name email)"
