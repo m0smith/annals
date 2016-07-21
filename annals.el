@@ -1005,8 +1005,6 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
   (interactive)
   (org-open-file (annals-project-choose)))
 
-;; "\\s.\\s-+\\([a-zA-Z ]*\\)\\s-+<\\(.*\\)>[[:space:]\\|,]"
-;; standard email syntax
 
 (defun annals-contacts-from-eml (file)
   "Get the contacts from the file.  Contacts are First Last  <me@here.com>. 
@@ -1021,10 +1019,7 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
 	(add-to-list 'rtnval (list name email)))
       (setq next-start (match-end 0)))
       
-    rtnval)
-
-;;    (string-match "\\s.\\s-+\\([a-zA-Z ]*\\)\\s-+<\\(.*\\)>" eml-contents 0))
-  )
+    rtnval))
 
 
 (defun annals-contacts-from-org (file)
@@ -1062,19 +1057,54 @@ mailto: protocol.  Returns a list with (name email)"
 
 
 
+(defun annals-time-file-predicate  (regexp time file dir)
+  "True if FILE matches `find-lisp-regexp' and the modification time is after TIME.
+DIR is the directory containing FILE. "
+  (and find-lisp-debug
+       (find-lisp-debug-message
+	(format "Processing file %s in %s" file dir)))
+  (let ((path (expand-file-name file dir)))
+    (and (not (file-directory-p path ))
+	 (string-match regexp file)
+	 (or (not time)
+	     (time-less-p time (nth 5 (file-attributes path)))))))
+
+
+(defun annals-find-newer-files (directory regexp time)
+  "Find files in DIRECTORY which match REGEXP which have been
+updated since TIME.  If time is nil, return all matching files"
+
+  (let ((file-predicate      (-partial 'annals-time-file-predicate regexp time))
+	(directory-predicate 'find-lisp-default-directory-predicate)
+	(find-lisp-regexp regexp))
+    (find-lisp-find-files-internal
+     directory
+     file-predicate
+     directory-predicate)))
+
+
+(defvar annals-contacts-timestamp nil
+  "As `annals-contacts' can take a long time, keep track of the last time it was run. To clear the cache, set this to nil")
+
+(defvar annals-contacts-cache nil
+  "As `annals-contacts' can take a long time, keep track of the last results.  See also `annals-contacts-timestamp'.")
+  
 ;;;###autoload
 (defun annals-contacts ()
   "Go through the annals and find all contacts.  Return as a list of (name email) pairs."
   (interactive)
   (make-local-variable 'org-agenda-files)
-  (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$"))
-	(eml-files (find-lisp-find-files annals-active-directory "\\.eml$"))
-	rtvnal)
-    (setq rtnval (list))
+  (let ((org-agenda-files (annals-find-newer-files annals-active-directory "\\.org$" annals-contacts-timestamp))
+	(eml-files (annals-find-newer-files annals-active-directory "\\.eml$" annals-contacts-timestamp))
+	rtnval)
+    (setq annals-contacts-timestamp (current-time))
+    (setq rtnval annals-contacts-cache)
     (dolist (contact  (-flatten-n 1 (mapcar 'annals-contacts-from-org org-agenda-files)) rtnval)
       (add-to-list 'rtnval contact))
     (dolist (contact  (-flatten-n 1 (mapcar 'annals-contacts-from-eml eml-files)) rtnval)
-      (add-to-list 'rtnval contact))))
+      (add-to-list 'rtnval contact))
+    (setq annals-contacts-cache rtnval)))
+
 
 (defun annals-contact-key (p)
   (list (format "%s <%s>" (first p) (second p))
