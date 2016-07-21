@@ -764,7 +764,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defvar annals-project-choose-history nil)
   
 (defun annals-project-choose (&optional dir)
-  "Give the user a list of projects in DIR (default to `annals-active-directory`) and return the folder for the selected project"
+  "Give the user a list of projects in DIR (default to `annals-active-directory') and return the folder for the selected project"
 
   (let* ((project-dir (or dir annals-active-directory))
 	 (current-dir (expand-file-name (file-name-as-directory default-directory)))
@@ -792,7 +792,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
   (expand-file-name "annals.org" (annals-project-choose)))
 
 (defun annals-update-org-capture-templates(entry)
-  "Add ENTRY to `org-capture-templates` if the key (car entry) is not already in the list.  If it is, replace it."
+  "Add ENTRY to `org-capture-templates' if the key (car entry) is not already in the list.  If it is, replace it."
   (let ((existing (assoc (car entry) org-capture-templates)))
     (if existing
 	(setcdr existing (cdr entry))
@@ -801,10 +801,10 @@ It also moves the task to the archive dir `annals-archive-directory'.
 
 
 (defun annals-capture-templates-setup ( )
-  "Add the annals templates to the `org-captur-templates`."
+  "Add the annals templates to the `org-capture-templates'."
   (interactive)
 
-  (annals-update-org-capture-templates '("t" "Todo" entry
+  (annals-update-org-capture-templates '("t" "Todo into default notes file" entry
 					 (file+headline nil "Tasks")
 					 "* TODO %?\n  %i\n  %a"))
 
@@ -813,10 +813,16 @@ It also moves the task to the archive dir `annals-archive-directory'.
 					 (function annals-capture-ics-parse))) ;;annals-capture-ics-template)))
     
   (annals-update-org-capture-templates '("a" "Annals templates"))
+
+  (annals-update-org-capture-templates '("at" "Todo into a project" entry
+					 (file+headline annals-project-choose-annal "Tasks")
+					 "* TODO %?\n  %i\n  %a"))
   
   (annals-update-org-capture-templates '("ai" "Annals Task/Issue to existing project"  entry
 					 (file+headline  annals-project-choose-annal "Issues")
 					 (function annals-task-template))))
+
+
 
 
 
@@ -999,8 +1005,31 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
   (interactive)
   (org-open-file (annals-project-choose)))
 
+;; "\\s.\\s-+\\([a-zA-Z ]*\\)\\s-+<\\(.*\\)>[[:space:]\\|,]"
+;; standard email syntax
+
+(defun annals-contacts-from-eml (file)
+  "Get the contacts from the file.  Contacts are First Last  <me@here.com>. 
+ Returns a list with (name email)"
+  (interactive "fEML file: ")
+  (let ((eml-contents (annals-get-string-from-file file))
+	(next-start 0)
+	(rtnval '()))
+    (while (string-match "[:,]\\s-+\\([ a-zA-Z0-9]*\\)\\s-+<\\([a-zA-Z0-9.]+@[a-zA-Z0-9.]+\\)>" eml-contents next-start) ;
+      (let ((name (replace-regexp-in-string "[ \t\n]+$" "" (match-string 1 eml-contents)))
+	    (email (match-string 2 eml-contents)))
+	(add-to-list 'rtnval (list name email)))
+      (setq next-start (match-end 0)))
+      
+    rtnval)
+
+;;    (string-match "\\s.\\s-+\\([a-zA-Z ]*\\)\\s-+<\\(.*\\)>" eml-contents 0))
+  )
+
+
 (defun annals-contacts-from-org (file)
-  "Get the contacts from the file.  Contacts are links with a mailto: protocol.  Returns a list with (name email)"
+  "Get the contacts from the file.  Contacts are links with a
+mailto: protocol.  Returns a list with (name email)"
   (interactive "fannals file:")
   (let* ((org-startup-folded nil)
 	 (org-startup-align-all-tables nil)
@@ -1031,15 +1060,20 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
 
 	      results)))))))
 
+
+
 ;;;###autoload
 (defun annals-contacts ()
   "Go through the annals and find all contacts.  Return as a list of (name email) pairs."
   (interactive)
   (make-local-variable 'org-agenda-files)
   (let ((org-agenda-files (find-lisp-find-files annals-active-directory "\\.org$"))
+	(eml-files (find-lisp-find-files annals-active-directory "\\.eml$"))
 	rtvnal)
     (setq rtnval (list))
     (dolist (contact  (-flatten-n 1 (mapcar 'annals-contacts-from-org org-agenda-files)) rtnval)
+      (add-to-list 'rtnval contact))
+    (dolist (contact  (-flatten-n 1 (mapcar 'annals-contacts-from-eml eml-files)) rtnval)
       (add-to-list 'rtnval contact))))
 
 (defun annals-contact-key (p)
