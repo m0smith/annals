@@ -147,6 +147,7 @@
 (require 'desktop)
 (require 'find-lisp)
 (require 'org-capture)
+(require 'json)
 
 (defgroup annals nil
   "EMACS task based session manager and developer notebook"
@@ -351,7 +352,7 @@ Jira issue or nil."
   (let* ((jira-issue (annals-jira task-id))
 	 (jira-summary (annals-jira-summary jira-issue))
 	 (title (when jira-summary 
-		    (format "* TASK [[%s][%s]] %s\n\n" (annals-jira-browse-url task-id) task-id jira-summary))))
+		    (format "* TASK [[%s][%s]] %s\n\n   :PROPERTIES:\n   :ANNALS_TASK_ID: %s\n   :END: \n\n" (annals-jira-browse-url task-id) task-id jira-summary task-id))))
 		  
     (when title title)))
 
@@ -388,8 +389,8 @@ Jira issue or nil."
 	 (github-summary (annals-jira-attribute github-issue 'title))
 	 (github-url (annals-jira-attribute github-issue 'html_url))
 	 (title (when github-summary 
-		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n" task-id github-summary
-			  github-url task-id github-summary) )))
+		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n   :PROPERTIES:\n   :ANNALS_TASK_ID: %s\n   :END: \n\n" task-id github-summary
+			  github-url task-id github-summary task-id) )))
     (when title
       (format "%s" title))))
 
@@ -1185,7 +1186,7 @@ updated since TIME.  If time is nil, return all matching files"
 
 (defun annals-init ()
   "Startup annals"
-
+  (interactive)
   (add-hook 'desktop-no-desktop-file-hook 
 	    (lambda ()
 	      (setq annals-buffer-name-counter 1)))
