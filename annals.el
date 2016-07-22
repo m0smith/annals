@@ -639,13 +639,16 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 
 
 (defvar annals-task-template-history nil)
-
+(defvar annals-project-choose-new-task-annal-task-id nil
+  "A place holder for task-id when creating a new task project.")
 
 ;;;###autoload
 (defun annals-task-template ()
   "Return the template for the given task."
   (interactive)
-  (let ((task-id (read-from-minibuffer "Task: " nil nil nil 'annals-task-template-history)))
+  (let ((task-id (or annals-project-choose-new-task-annal-task-id
+		     (read-from-minibuffer "Task: " nil nil nil 'annals-task-template-history))))
+    (setq annals-project-choose-new-task-annal-task-id task-id)
     (run-hook-with-args-until-success 'annals-task-template-create-hook task-id)))
   
 
@@ -792,6 +795,22 @@ It also moves the task to the archive dir `annals-archive-directory'.
   "Allow the user to select an annals.org file"
   (expand-file-name "annals.org" (annals-project-choose)))
 
+
+(defun annals-project-choose-new-task-annal ()
+  "Allow the user to select a new project.  Create the directory and the annals.org file"
+
+  (let* ((task-id (or annals-project-choose-new-task-annal-task-id (read-from-minibuffer "Task ID: ")))
+	 (parent (annals-project-choose))
+	 (new-project (expand-file-name task-id parent))
+	 (rtnval (expand-file-name "annals.org" new-project)))
+    (make-directory new-project t)
+    (write-region "" nil rtnval)
+    (if annals-project-choose-new-task-annal-task-id
+	(setq annals-project-choose-new-task-annal-task-id task-id)
+      (setq annals-project-choose-new-task-annal-task-id nil))
+      
+    rtnval))
+
 (defun annals-update-org-capture-templates(entry)
   "Add ENTRY to `org-capture-templates' if the key (car entry) is not already in the list.  If it is, replace it."
   (let ((existing (assoc (car entry) org-capture-templates)))
@@ -821,7 +840,13 @@ It also moves the task to the archive dir `annals-archive-directory'.
   
   (annals-update-org-capture-templates '("ai" "Annals Task/Issue to existing project"  entry
 					 (file+headline  annals-project-choose-annal "Issues")
+					 (function annals-task-template)))
+
+  (annals-update-org-capture-templates '("aI" "Annals Task/Issue as a new project"  entry
+					 (file annals-project-choose-new-task-annal)
 					 (function annals-task-template))))
+
+  
 
 
 
