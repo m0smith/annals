@@ -960,9 +960,11 @@ Otherwise, append current line to the end of the return list."
       (cdr subtree))))
 
 (defun annals-capture-ics-parse-attendees* (attendee-info)
-  (format "[[%s][%s]]\n" 
-	  (first(last attendee-info))
-	  (replace-regexp-in-string "[\"]" "" (substring (first (-filter (lambda (e) (string-match "^CN=" e)) attendee-info)) 3))))
+  (let ((email 	  (first (last attendee-info))))
+    (format "*** [[mailto:%s][%s]]\n    :PROPERTIES:\n    :EMAIL:  %s\n    :END:\n" 
+	    email
+	    (replace-regexp-in-string "[\"]" "" (substring (first (-filter (lambda (e) (string-match "^CN=" e)) attendee-info)) 3))
+	    email)))
 
 
 (defun annals-capture-ics-parse-properties (tree)
@@ -974,7 +976,7 @@ Otherwise, append current line to the end of the return list."
   "Return a list of attendees"
   (let ((vevent (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT")))
 	(organizer (second (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "ORGANIZER")))))
-    (cons (format "Organizer: %s\n" organizer)
+    (cons (format "*** Organizer: %s\n    :PROPERTIES:\n    :EMAIL:     %s\n    :END:\n" organizer organizer)
 	  (-map 'annals-capture-ics-parse-attendees* (-filter (lambda (n) (string-equal "ATTENDEE" (car n))) vevent)))))
 (defun annals-capture-ics-parse-time-iso (time-string)
   "Expects something like 20160719T110000."
@@ -1209,8 +1211,8 @@ updated since TIME.  If time is nil, return all matching files"
 
 
 
-(defun annals-init ()
-  "Startup annals"
+(defun annals-mode ()
+  "Startup annals by adding `org-capture' templates, task id and email expansion shortcuts."
   (interactive)
   (add-hook 'desktop-no-desktop-file-hook 
 	    (lambda ()
