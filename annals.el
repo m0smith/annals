@@ -976,7 +976,7 @@ Otherwise, append current line to the end of the return list."
   "Return a list of attendees"
   (let ((vevent (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT")))
 	(organizer (second (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "ORGANIZER")))))
-    (cons (format "*** Organizer: %s\n    :PROPERTIES:\n    :EMAIL:     %s\n    :END:\n" organizer organizer)
+    (cons (format "*** %s\n Organizer\n   :PROPERTIES:\n    :EMAIL:     %s\n    :END:\n" organizer organizer)
 	  (-map 'annals-capture-ics-parse-attendees* (-filter (lambda (n) (string-equal "ATTENDEE" (car n))) vevent)))))
 (defun annals-capture-ics-parse-time-iso (time-string)
   "Expects something like 20160719T110000."
@@ -1013,7 +1013,7 @@ Otherwise, append current line to the end of the return list."
 	 (attendees (annals-capture-ics-parse-attendees tree)))
 
     (setq org-capture-plist (plist-put org-capture-plist :ics-file file))
-    (format "* %s\n%s\n#+DRAWERS:     ICS\n:PROPERTIES:\n%s\n:END:\n:ICS:\n%s\n:END:\n\n** Attendees\n%s\n\n** Agenda\n%s\n** Notes\n"
+    (format "* %s\n%s\n#+DRAWERS:     ICS\n:PROPERTIES:\n%s\n:END:\n:ICS:\n%s\n:END:\n\n** Attendees\n%s\n\n** Agenda\n%s\n** Notes\n\n"
 	    (car summary)
 	    (annals-capture-ics-parse-time tree)
 	    properties
@@ -1033,6 +1033,25 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
   (interactive)
   (org-open-file (annals-project-choose)))
 
+
+(defun annals-contacts-from-org-contacts ()
+  "Return a list of contacts from `org-contacts-db' if org-contacts is loaded"
+  (when (featurep 'org-contacts)
+    (let ((todo-only nil)
+	  (rtnval nil))
+      (dolist (contact (org-contacts-db) rtnval)
+	(let* ((email  (cdr (assoc "EMAIL" (car (cddr contact)))))
+	       (name   (substring-no-properties (first contact)))
+	       (name2  (annals-name-email-from-link name))
+	       (name   (if name2 (first name2) name)))
+	  
+	  ;;annals-name-email-from-link
+	  (when (and email
+		     (not (string-equal email "nil")))
+	    (add-to-list 'rtnval
+			 (list name (downcase email)))))))))
+  
+    
 
 (defun annals-contacts-from-eml (file)
   "Get the contacts from the file.  Contacts are First Last  <me@here.com>. 
@@ -1118,10 +1137,13 @@ updated since TIME.  If time is nil, return all matching files"
   "As `annals-contacts' can take a long time, keep track of the last results.  See also `annals-contacts-timestamp'.")
   
 ;;;###autoload
-(defun annals-contacts ()
+(defun annals-contacts (&optional refresh)
   "Go through the annals and find all contacts.  Return as a list of (name email) pairs."
   (interactive)
   (make-local-variable 'org-agenda-files)
+  (when refresh
+    (setq annals-contacts-timestamp nil
+	  annals-contacts-cache nil))
   (let ((org-agenda-files (annals-find-newer-files annals-active-directory "\\.org$" annals-contacts-timestamp))
 	(eml-files (annals-find-newer-files annals-active-directory "\\.eml$" annals-contacts-timestamp))
 	rtnval)
@@ -1131,12 +1153,21 @@ updated since TIME.  If time is nil, return all matching files"
       (add-to-list 'rtnval contact))
     (dolist (contact  (-flatten-n 1 (mapcar 'annals-contacts-from-eml eml-files)) rtnval)
       (add-to-list 'rtnval contact))
+    
+    (dolist (contact (annals-contacts-from-org-contacts) rtnval)
+      (add-to-list 'rtnval contact))
     (setq annals-contacts-cache rtnval)))
 
 
+(defun annals-name-email-from-link (link)
+  "Return (nam email) if link is [[mailto:email][name]]"
+  (when (string-match "\\[\\[mailto:\\([^]]*\\)\\]\\[\\([^]]*\\)\\]\\]" link)
+    (list (match-string 2 link) (match-string 1 link)))
+  )
+
 (defun annals-contact-key (p)
   (list (format "%s <%s>" (first p) (second p))
-	(first p) (second p)))
+	(first p) (downcase (second p))))
 
 (defun annals-contact-insert ()
   "Get a list of contacts from the annals and pick one from the list to insert."
