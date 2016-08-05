@@ -1043,7 +1043,7 @@ exists, ask the user permission to delete it.  For use as a hook with `annals-ca
 	(rtnval '()))
     (while (string-match "[:,]\\s-+\\([ a-zA-Z0-9]*\\)\\s-+<\\([a-zA-Z0-9.]+@[a-zA-Z0-9.]+\\)>" eml-contents next-start) ;
       (let ((name (replace-regexp-in-string "[ \t\n]+$" "" (match-string 1 eml-contents)))
-	    (email (match-string 2 eml-contents)))
+	    (email (downcase (match-string 2 eml-contents))))
 	(add-to-list 'rtnval (list name email)))
       (setq next-start (match-end 0)))
       
@@ -1079,7 +1079,7 @@ mailto: protocol.  Returns a list with (name email)"
 	      (while (search-forward-regexp "\\[\\[mailto:\\([^]]*\\)\\]\\[\\([^]]*\\)\\]\\]" nil t)
 		(add-to-list 'results (list (replace-regexp-in-string " +" " "
 								      (buffer-substring-no-properties (match-beginning 2) (match-end 2)))
-					    (buffer-substring-no-properties (match-beginning 1) (match-end 1)))))
+					    (downcase (buffer-substring-no-properties (match-beginning 1) (match-end 1))))))
 
 	      results)))))))
 
