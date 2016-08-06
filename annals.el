@@ -1169,7 +1169,7 @@ updated since TIME.  If time is nil, return all matching files"
   (list (format "%s <%s>" (first p) (second p))
 	(first p) (downcase (second p))))
 
-(defun annals-contact-insert ()
+(defun annals-contact-completing-read ()
   "Get a list of contacts from the annals and pick one from the list to insert."
   (interactive)
   (let* ((coll (mapcar 'annals-contact-key (annals-contacts)))
@@ -1212,7 +1212,13 @@ updated since TIME.  If time is nil, return all matching files"
   (let ((parts (split-string email "@")))
     (when (and (= 2 (length parts))
 	       (< 0 (length (first parts))))
-      (capitalize (replace-regexp-in-string "[.]" " " (car parts))))))
+      (let ((rtnval (capitalize (replace-regexp-in-string "[.]" " " (car parts)))))
+	(if (not (string-match "[a-zA-Z]+[.][a-zA-Z]+" (car parts)))
+	    (let ((entry (read-from-minibuffer (format "Name (default %s): " rtnval))))
+	      (if (string-equal "" entry)
+		  rtnval
+		entry))
+	  rtnval)))))
 
 (defun annals-email-to-link (email start end)
 "If EMAIL is an email looking thing, convert it to an org-mode link"
@@ -1232,7 +1238,7 @@ updated since TIME.  If time is nil, return all matching files"
   "When looking at an @, remove it and insert a contact."
   (when (string-equal "@" cw)
     (delete-region start end)
-    (annals-contact-insert)))
+    (annals-contact-completing-read)))
 
 (defun annals-at-to-contact-hook ()
   "Hook to look for @ and insert a contact"
