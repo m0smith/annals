@@ -862,8 +862,9 @@ It also moves the task to the archive dir `annals-archive-directory'.
 	   (parts (split-string line ";"))
 	   (parts-alist (-map (lambda (x) (split-string x "="))(-drop 1 parts)))
 	   (mailto (car (last (split-string  (cadr (assoc "PARTSTAT" parts-alist)) ":"))))
-	   (rtnval (format "[[mailto:%s][%s]]" mailto
-			   (replace-regexp-in-string "[\"]" "" (second (assoc "CN" parts-alist) )))))
+	   (name replace-regexp-in-string "[\"]" "" (second (assoc "CN" parts-alist)))
+	   (rtnval (format "[[mailto:%s][%s]]" mailto name)))
+			   
       (delete-region bol eol)
       (goto-char bol)
       (insert rtnval)
@@ -902,7 +903,8 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defun annals-combine-lines* (pred r l)
   "When (PRED l) is true, append R (assumed to be a string, to the first element of L.  Otherwise, cons R onto L"
   (if (funcall pred l)
-      (cons (format "%s%s" (car r) l) (cdr r))
+      
+      (cons (format "%s%s" (car r) (substring l 1)) (cdr r))
     (cons l r)))
 
 (defun annals-combine-lines (pred lines)
@@ -960,10 +962,11 @@ Otherwise, append current line to the end of the return list."
       (cdr subtree))))
 
 (defun annals-capture-ics-parse-attendees* (attendee-info)
-  (let ((email 	  (first (last attendee-info))))
+  (let ((email 	  (first (last attendee-info)))
+	(name (replace-regexp-in-string "[\"]" "" (substring (first (-filter (lambda (e) (string-match "^CN=" e)) attendee-info)) 3))))
     (format "*** [[mailto:%s][%s]]\n    :PROPERTIES:\n    :EMAIL:  %s\n    :END:\n" 
 	    email
-	    (replace-regexp-in-string "[\"]" "" (substring (first (-filter (lambda (e) (string-match "^CN=" e)) attendee-info)) 3))
+	    name
 	    email)))
 
 
