@@ -148,6 +148,8 @@
 (require 'find-lisp)
 (require 'org-capture)
 (require 'json)
+(require 'dash)
+(require 'cl)
 
 (defgroup annals nil
   "EMACS task based session manager and developer notebook"
@@ -650,6 +652,7 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 		     (read-from-minibuffer "Task: " nil nil nil 'annals-task-template-history))))
     (setq annals-project-choose-new-task-annal-task-id task-id)
     (run-hook-with-args-until-success 'annals-task-template-create-hook task-id)))
+
   
 
 ;;;###autoload
@@ -1250,6 +1253,10 @@ updated since TIME.  If time is nil, return all matching files"
     (apply 'annals-at-to-contact cw)))
 
 
+(defun annals-dnd-callback (event)
+  (message "Event %S" event))
+
+
 
 (defun annals-mode ()
   "Startup annals by adding `org-capture' templates, task id and email expansion shortcuts."
@@ -1290,7 +1297,11 @@ updated since TIME.  If time is nil, return all matching files"
 	       
   ;; Capture
 
-  (annals-capture-templates-setup))
+  (annals-capture-templates-setup)
+  ;; Not working until 25.1 of EMACS
+  ;; (file-notify-add-watch   (expand-file-name "~/annals/tmp")   '(change attribute-change) 'annals-dnd-callback)
+  )
+
 
 (provide 'annals)
 
