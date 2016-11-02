@@ -653,7 +653,61 @@ If the currently active task is selected, simply call `annals-checkpoint'.
     (setq annals-project-choose-new-task-annal-task-id task-id)
     (run-hook-with-args-until-success 'annals-task-template-create-hook task-id)))
 
-  
+
+(defun annals-buffers-with-mode (mode)
+  "Return a list of all buffers matching mode"
+   (cl-loop for buf being the buffers
+            when (with-current-buffer buf (eq major-mode mode))
+            collect buf))
+
+(defun annals-tag-agenda-buffer-p (buf tag)
+  "Return true if the buffer BUF was a search for TAG"
+  (with-current-buffer buf
+    (save-excursion
+      (let ((type  (get-text-property (point-min) 'org-agenda-type))
+            (args  (get-text-property (point-min) 'org-last-args)))
+        (when (and (eq type 'tags)
+                   (string= (cadr args) tag))
+          buf)))))
+
+(defun annals-property-markers (prop &optional buf)
+  "Rerturn a list of markers where PROP is a test property in BUF."
+  (interactive)
+  (let ((buf (or buf (current-buffer)))
+        (p (point-min))
+        (rtnval nil))
+    (setq p (next-single-property-change p prop buf))
+    (while p
+      (let ((mk (get-text-property p prop buf)))
+        (when mk
+          (add-to-list 'rtnval mk)))
+      (setq p (next-single-property-change p prop buf)))
+    rtnval))
+
+
+(defun annals-add-active-to-clock-history ()
+  "Add the active tags to the clock history."
+  (interactive)
+  (save-current-buffer
+    (org-tags-view t "annals#active")
+    
+    (let ((buf (cl-loop for buf in (annals-buffers-with-mode 'org-agenda-mode)
+			when (annals-tag-agenda-buffer-p buf "annals#active")
+			return buf)))
+      (when buf
+	(dolist (m (annals-property-markers 'org-hd-marker))
+	  (org-clock-history-push (marker-position m) (marker-buffer m)))))))
+      
+
+
+
+(defun annals-activate ()
+  (interactive)
+  (org-toggle-tag "annals#active" 'on))
+
+(defun annals-deactivate ()
+  (interactive)
+  (org-toggle-tag "annals#active" 'off))
 
 ;;;###autoload
 (defun annals-archive (task-id)
@@ -1261,6 +1315,7 @@ updated since TIME.  If time is nil, return all matching files"
 (defun annals-mode ()
   "Startup annals by adding `org-capture' templates, task id and email expansion shortcuts."
   (interactive)
+  (annals-add-active-to-clock-history)
   (add-hook 'desktop-no-desktop-file-hook 
 	    (lambda ()
 	      (setq annals-buffer-name-counter 1)))
