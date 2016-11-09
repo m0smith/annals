@@ -1317,7 +1317,38 @@ updated since TIME.  If time is nil, return all matching files"
   (let ((task-region (annals-current-word-region)))
     (apply 'annals-jira-to-link  task-region)
     (annals-jira-add-id-property (car task-region))))
-	 
+
+(defun annals-jira-add-comment (issue comment)
+  "Add a comment to a Jira issue."
+  (let ((url (format "%s/rest/api/latest/issue/%s/comment" annals-jira-server issue))
+        (data (json-encode (list (cons "body" comment)))))
+    (unless (url-get-authentication url nil 'any t)
+      (url-basic-auth (url-generic-parse-url url) t))
+    
+    (annals-json-call url "POST" data '(("Content-Type" . "application/json")))))
+
+
+(defun annals-jira-log-hook ()
+  "Hook to for `org-log-buffer-setup-hook' that will also send
+the log as a Jira comment."
+  (let ((task-id (org-entry-get org-log-note-marker annals-jira-id-property-name)))
+    (when task-id
+      (lexical-let* ((f org-finish-function)
+                     (task-id task-id)
+                     (new-f (cl-gensym "annals-jira-log-finish-function-temp-")))
+
+        (fset new-f (lambda ()
+                      (unless org-note-abort
+			(let ((txt (buffer-string)))
+			  (while (string-match "\\`# .*\n[ \t\n]*" txt)
+			    (setq txt (replace-match "" t t txt)))
+			  (if (string-match "\\s-+\\'" txt)
+			      (setq txt (replace-match "" t t txt)))
+                        (annals-jira-add-comment task-id txt)))
+                      (funcall f)))
+        
+        (setq org-finish-function new-f)))))
+
 
 (defun annals-name-from-email (email)
   "Given an EMAIL, return the name assuming the email is formatted like joe.biggs@email.com.  Returns \"Joe Biggs\"."
@@ -1377,6 +1408,10 @@ specific annals functionality."
 	    (lambda ()
 	      (setq annals-buffer-name-counter 1)))
 
+  ;; Log
+
+  (add-hook 'org-log-buffer-setup-hook  'annals-jira-log-hook )
+  
   ;; C-c C-c
   
   (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
