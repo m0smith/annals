@@ -136,8 +136,8 @@
 
 ;; Github Integration
 
-;; If the task id looks like a Jira ID (repo-project-digits like
-;; m0smith-annals-1) and annals-github-api-server is set to the URL of
+;; If the task id looks like a Github ID (repo-project-digits like
+;; m0smith/annals/gh-1) and annals-github-api-server is set to the URL of
 ;; the (Github API server), then annals.org will have a link to the
 ;; Github issue and will also pull in the issue summary.
 ;;
@@ -199,10 +199,10 @@
 		 (string :tag "URL")))
 
 
-(defcustom annals-github-task-separator "-"
+(defcustom annals-github-task-separator "/"
   "Separator used in task-id to separator repo, project, and
   issue id.  For example, if the annals-github-task-separator
-  were set to \"_\" then the task id for the first issue of the
+  were set to \".\" then the task id for the first issue of the
   annals project would be \"m0smith.annals.1\"."
   :group 'annals
   :package-version '(annals . "1.0")
@@ -332,17 +332,20 @@ URL is the REST URL to call."
 ;;
 
 (defun annals-jira-rest-url (issue-id)
-  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+" issue-id))
+  (when (and annals-jira-server (string-match "^[A-Z]+-[0-9]+$" issue-id))
     (format "%s/rest/api/latest/issue/%s" annals-jira-server issue-id)))
 
 (defun annals-jira-browse-url (issue-id)
-  (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+" issue-id))
+  (when (and annals-jira-server (string-match "^[A-Z]+-[0-9]+$" issue-id))
       (format "%s/browse/%s" annals-jira-server issue-id)))
 
 (defvar annals-jira-id-property-name "ANNALS_JIRA_ID")
 
 (defun annals-jira-add-id-property (issue-id)
   (org-set-property annals-jira-id-property-name issue-id))
+
+(defun annals-github-add-id-property (issue-id)
+  (org-set-property annals-github-id-property-name issue-id))
 
 
 (defun annals-jira (issue-id)
@@ -405,7 +408,7 @@ Jira issue or nil."
 ;;;
 
 (defun annals-github-format ( pattern url issue-id)
-  (let ((r-pat (format "^\\([a-zA-Z0-9]+\\)%s\\([-0-9a-zA-Z]+\\)%s\\([0-9]+\\)$" 
+  (let ((r-pat (format "^\\([a-zA-Z0-9-]+\\)%s\\([-0-9a-zA-Z]+\\)%sgh-\\([0-9]+\\)$" 
 		       annals-github-task-separator
 		       annals-github-task-separator)))
     (when (string-match r-pat issue-id)
@@ -417,6 +420,11 @@ Jira issue or nil."
 "Looks like https://api.github.com/repos/m0smith/malabar-mode/issues/134"
   (when annals-github-api-server
     (annals-github-format "%s/repos/%s/%s/issues/%s" annals-github-api-server issue-id)))
+
+(defun annals-github-browse-url (issue-id)
+"Looks like https://github.com/jdee-emacs/jdee/issues/83"
+  (when annals-github-browser-server
+    (annals-github-format "%s/%s/%s/issues/%s" annals-github-browser-server issue-id)))
 
 (defun annals-github (issue-id)
   "Pull the JSON info for the github issue."
@@ -1311,12 +1319,32 @@ updated since TIME.  If time is nil, return all matching files"
      (insert (format "[[%s][%s]]" url task-id))
      url)))
 
+(defun annals-github-to-link (url task-id start end)
+"If TASK-ID is a Jira issue ID, convert it to an org link"
+   (when url
+     (goto-char start)
+     (delete-region start end)
+     (insert (format "[[%s][%s]]" url task-id))
+     url))
+
+
 (defun annals-task-id-to-link-hook ()
   "If the cursor is on a Jira task id, convert it to an org mode link."
   (interactive)
   (let ((task-region (annals-current-word-region)))
-    (apply 'annals-jira-to-link  task-region)
-    (annals-jira-add-id-property (car task-region))))
+    (-when-let (rtnval (apply 'annals-jira-to-link  task-region))
+      (annals-jira-add-id-property (car task-region))
+      rtnval)))
+
+
+(defun annals-github-task-id-to-link-hook ()
+  "If the cursor is on a Github task id, convert it to an org mode link."
+  (interactive)
+  (let* ((task-region (annals-current-word-region))
+	 (url (annals-github-browse-url (car task-region))))
+    (-when-let (rtnval (apply 'annals-github-to-link  url task-region))
+      (annals-github-add-id-property (car task-region))
+      rtnval)))
 
 (defun annals-jira-add-comment (issue comment)
   "Add a comment to a Jira issue."
@@ -1417,6 +1445,8 @@ specific annals functionality."
   (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
   
   (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
+
+  (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-github-task-id-to-link-hook)
   
   (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
   
@@ -1427,6 +1457,8 @@ specific annals functionality."
   (add-hook 'org-tab-before-tab-emulation-hook 'annals-capture-ics-attendee-hook)
   
   (add-hook 'org-tab-before-tab-emulation-hook 'annals-task-id-to-link-hook)
+
+  (add-hook 'org-tab-before-tab-emulation-hook 'annals-github-task-id-to-link-hook)
   
   (add-hook 'org-tab-before-tab-emulation-hook 'annals-email-to-link-hook)
   
