@@ -150,12 +150,20 @@
 (require 'json)
 (require 'dash)
 (require 'cl)
+(require 'org-attach)
+(require 'org-clock)
 
 (defgroup annals nil
   "EMACS task based session manager and developer notebook"
   :prefix "annals-"
   :group 'tools
   :link '(url-link :tag "Github" "https://github.com/m0smith/annals/"))
+
+(defcustom annals-active-tag "annals#active"
+  "The tag that marks a headline as part of annals"
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type 'string)
 
 (defcustom annals-active-directory (expand-file-name "~/annals")
   "Directory where all the active tasks live"
@@ -249,14 +257,37 @@ The functions in the list will be called until one returns non-nil, meaning it a
  "annals.org")
 
 
-(defun annals-json-call (url)
+(defun annals-deactivate-task ()
+  (interactive)
+  (desktop-save (org-attach-dir) t))
+
+
+(defun annals-desktop-ignore-buffers ()
+  (add-to-list 'desktop-clear-preserve-buffers (buffer-name))
+  (mapcar (lambda (m) (add-to-list 'desktop-clear-preserve-buffers
+				   (buffer-name (marker-buffer m))))
+	  org-clock-history))
+
+(defun annals-activate-task ()
+  (interactive)
+  (let ((dir (org-attach-dir t))
+	(desktop-clear-preserve-buffers desktop-clear-preserve-buffers))
+    (annals-desktop-ignore-buffers)
+    (when dir
+      (org-clock-history-push)
+      (desktop-change-dir dir)
+      (unless desktop-save-mode
+	(desktop-save-mode)))))
+
+
+(defun annals-json-call (url &optional method data headers)
   "Call a URL expecting JSON back.  Return the JSON formatted as vectors and alists for the arrays and maps.
 
 URL is the REST URL to call."
 
-  (setq url-request-method "GET"
-	url-request-extra-headers nil
-	url-request-data nil)
+  (setq url-request-method (or method "GET")
+	url-request-extra-headers headers
+	url-request-data data)
   
   (with-current-buffer (url-retrieve-synchronously url)
     (goto-char url-http-end-of-headers)
@@ -308,6 +339,12 @@ URL is the REST URL to call."
   (when (and annals-jira-server (string-match "[A-Z]+-[0-9]+" issue-id))
       (format "%s/browse/%s" annals-jira-server issue-id)))
 
+(defvar annals-jira-id-property-name "ANNALS_JIRA_ID")
+
+(defun annals-jira-add-id-property (issue-id)
+  (org-set-property annals-jira-id-property-name issue-id))
+
+
 (defun annals-jira (issue-id)
   (setq 
 	url-http-extra-headers nil
@@ -354,7 +391,11 @@ Jira issue or nil."
   (let* ((jira-issue (annals-jira task-id))
 	 (jira-summary (annals-jira-summary jira-issue))
 	 (title (when jira-summary 
-		    (format "* TASK [[%s][%s]] %s\n\n   :PROPERTIES:\n   :ANNALS_TASK_ID: %s\n   :END: \n\n" (annals-jira-browse-url task-id) task-id jira-summary task-id))))
+		  (format "* TASK [[%s][%s]] %s\n\n   :PROPERTIES:\n   :%s: %s\n   :END: \n\n" (annals-jira-browse-url task-id)
+			  task-id
+			  jira-summary
+			  annals-jira-id-property-name
+			  task-id))))
 		  
     (when title title)))
 
@@ -384,6 +425,8 @@ Jira issue or nil."
       (url-basic-auth (url-generic-parse-url url) t))
     (annals-json-call url)))
 
+(defvar annals-github-id-property-name "ANNALS_GITHUB_ID")
+
 (defun annals-github-create-file-template (task-id)
   "Return a template for a Github issue"
   
@@ -391,8 +434,13 @@ Jira issue or nil."
 	 (github-summary (annals-jira-attribute github-issue 'title))
 	 (github-url (annals-jira-attribute github-issue 'html_url))
 	 (title (when github-summary 
-		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n   :PROPERTIES:\n   :ANNALS_TASK_ID: %s\n   :END: \n\n" task-id github-summary
-			  github-url task-id github-summary task-id) )))
+		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n   :PROPERTIES:\n   :%s: %s\n   :END: \n\n" task-id
+			  github-summary
+			  github-url
+			  task-id
+			  github-summary
+			  annals-github-id-property-name
+			  task-id) )))
     (when title
       (format "%s" title))))
 
@@ -689,10 +737,10 @@ If the currently active task is selected, simply call `annals-checkpoint'.
   "Add the active tags to the clock history."
   (interactive)
   (save-current-buffer
-    (org-tags-view t "annals#active")
+    (org-tags-view t annals-active-tag)
     
     (let ((buf (cl-loop for buf in (annals-buffers-with-mode 'org-agenda-mode)
-			when (annals-tag-agenda-buffer-p buf "annals#active")
+			when (annals-tag-agenda-buffer-p buf annals-active-tag)
 			return buf)))
       (when buf
 	(dolist (m (annals-property-markers 'org-hd-marker))
@@ -703,11 +751,11 @@ If the currently active task is selected, simply call `annals-checkpoint'.
 
 (defun annals-activate ()
   (interactive)
-  (org-toggle-tag "annals#active" 'on))
+  (org-toggle-tag annals-active-tag 'on))
 
 (defun annals-deactivate ()
   (interactive)
-  (org-toggle-tag "annals#active" 'off))
+  (org-toggle-tag annals-active-tag 'off))
 
 ;;;###autoload
 (defun annals-archive (task-id)
@@ -1040,17 +1088,18 @@ Otherwise, append current line to the end of the return list."
 	  (-map 'annals-capture-ics-parse-attendees* (-filter (lambda (n) (string-equal "ATTENDEE" (car n))) vevent)))))
 (defun annals-capture-ics-parse-time-iso (time-string)
   "Expects something like 20160719T110000."
-  (when (string-match "\\([0-9]\\{4\\}\\)\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)T\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)" time-string)
-    (let* ((year (match-string 1 time-string))
-	  (month (match-string 2 time-string))
-	  (day (match-string 3 time-string))
-	  (hour (match-string 4 time-string))
-	  (minute (match-string 5 time-string))
-	  (second (match-string 6 time-string))
-	  (dow (format-time-string "%a" (date-to-time (format "%s-%s-%sT%s:%s:%s" year month day hour minute second))))) 
-      (format "%s-%s-%s %s %s:%s" year month day dow hour minute)))
+  (when time-string
+    (when (string-match "\\([0-9]\\{4\\}\\)\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)T\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)\\([0-9]\\{2\\}\\)" time-string)
+      (let* ((year (match-string 1 time-string))
+	     (month (match-string 2 time-string))
+	     (day (match-string 3 time-string))
+	     (hour (match-string 4 time-string))
+	     (minute (match-string 5 time-string))
+	     (second (match-string 6 time-string))
+	     (dow (format-time-string "%a" (date-to-time (format "%s-%s-%sT%s:%s:%s" year month day hour minute second))))) 
+	(format "%s-%s-%s %s %s:%s" year month day dow hour minute)))
      
-  )
+    ))
 (defun annals-capture-ics-parse-time (tree)
   (let ((start-time (second (annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "DTSTART"))))
 	(end-time (second( annals-capture-ics-search-tree tree '("VCALENDAR" "VEVENT" "DTEND")))))
@@ -1265,7 +1314,10 @@ updated since TIME.  If time is nil, return all matching files"
 (defun annals-task-id-to-link-hook ()
   "If the cursor is on a Jira task id, convert it to an org mode link."
   (interactive)
-  (apply 'annals-jira-to-link  (annals-current-word-region)))
+  (let ((task-region (annals-current-word-region)))
+    (apply 'annals-jira-to-link  task-region)
+    (annals-jira-add-id-property (car task-region))))
+	 
 
 (defun annals-name-from-email (email)
   "Given an EMAIL, return the name assuming the email is formatted like joe.biggs@email.com.  Returns \"Joe Biggs\"."
@@ -1310,7 +1362,12 @@ updated since TIME.  If time is nil, return all matching files"
 (defun annals-dnd-callback (event)
   (message "Event %S" event))
 
+(defun annals-buffer-mode ()
+  "Mode to add to `org-mode-hook' that will initialize the buffer
+specific annals functionality."
 
+;;desktop-buffers-not-to-save
+  (add-to-list 'desktop-clear-preserve-buffers (buffer-name)))
 
 (defun annals-mode ()
   "Startup annals by adding `org-capture' templates, task id and email expansion shortcuts."
@@ -1355,6 +1412,10 @@ updated since TIME.  If time is nil, return all matching files"
   (annals-capture-templates-setup)
   ;; Not working until 25.1 of EMACS
   ;; (file-notify-add-watch   (expand-file-name "~/annals/tmp")   '(change attribute-change) 'annals-dnd-callback)
+
+  (add-hook 'org-clock-in-hook 'annals-activate-task)
+  (add-hook 'org-clock-out-hook 'annals-deactivate-task)
+  (add-hook 'org-mode-hook 'annals-buffer-mode)
   )
 
 
