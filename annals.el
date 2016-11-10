@@ -171,6 +171,13 @@
   :package-version '(annals . "1.0")
   :type 'directory)
 
+(defcustom annals-jira-issue-directory (expand-file-name "Issues/Jira/" annals-active-directory)
+  "Directory where all new Jira issue org files are made."
+  :group 'annals
+  :package-version '(annals . "1.0")
+  :type 'directory)
+
+
 (defcustom annals-archive-directory (expand-file-name "~/annals/.archive")
   "Directory where all the archived tasks live"
   :group 'annals
@@ -394,10 +401,12 @@ Jira issue or nil."
   (let* ((jira-issue (annals-jira task-id))
 	 (jira-summary (annals-jira-summary jira-issue))
 	 (title (when jira-summary 
-		  (format "* TASK [[%s][%s]] %s\n\n   :PROPERTIES:\n   :%s: %s\n   :END: \n\n" (annals-jira-browse-url task-id)
+		  (format "* TASK [[%s][%s]] %s\n\n   :PROPERTIES:\n   :%s: %s\n   :ATTACH_DIR: %s\n   :ATTACH_DIR_INHERIT: t\n   :END: \n\n"
+			  (annals-jira-browse-url task-id)
 			  task-id
 			  jira-summary
 			  annals-jira-id-property-name
+			  task-id
 			  task-id))))
 		  
     (when title title)))
@@ -442,12 +451,14 @@ Jira issue or nil."
 	 (github-summary (annals-jira-attribute github-issue 'title))
 	 (github-url (annals-jira-attribute github-issue 'html_url))
 	 (title (when github-summary 
-		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n   :PROPERTIES:\n   :%s: %s\n   :END: \n\n" task-id
+		  (format "#+TITLE: %s %s \n\n* [[%s][%s]] %s\n\n   :PROPERTIES:\n   :%s: %s\n   :ATTACH_DIR: %s\n   :ATTACH_DIR_INHERIT: t\n   :END: \n\n"
+			  task-id
 			  github-summary
 			  github-url
 			  task-id
 			  github-summary
 			  annals-github-id-property-name
+			  task-id
 			  task-id) )))
     (when title
       (format "%s" title))))
@@ -881,7 +892,9 @@ It also moves the task to the archive dir `annals-archive-directory'.
 (defvar annals-project-choose-history nil)
   
 (defun annals-project-choose (&optional dir)
-  "Give the user a list of projects in DIR (default to `annals-active-directory') and return the folder for the selected project"
+  "Give the user a list of projects in DIR (default to
+`annals-active-directory') and return the folder for the selected
+project"
 
   (let* ((project-dir (or dir annals-active-directory))
 	 (current-dir (expand-file-name (file-name-as-directory default-directory)))
@@ -910,12 +923,16 @@ It also moves the task to the archive dir `annals-archive-directory'.
 
 
 (defun annals-project-choose-new-task-annal ()
-  "Allow the user to select a new project.  Create the directory and the annals.org file"
+  "Allow the user to select a new project.  Create the directory
+and the org file"
 
   (let* ((task-id (or annals-project-choose-new-task-annal-task-id (read-from-minibuffer "Task ID: ")))
-	 (parent (annals-project-choose))
-	 (new-project (expand-file-name task-id parent))
-	 (rtnval (expand-file-name "annals.org" new-project)))
+	 (insert-default-directory t)
+         (issue-file (format "%s.org" task-id))
+	 (rtnval (expand-file-name
+		  (read-file-name "Create file:" annals-jira-issue-directory
+				  nil nil issue-file)))
+	 (new-project (file-name-directory rtnval)))
     (make-directory new-project t)
     (write-region "" nil rtnval)
     (if annals-project-choose-new-task-annal-task-id
@@ -955,7 +972,7 @@ It also moves the task to the archive dir `annals-archive-directory'.
 					 (file+headline  annals-project-choose-annal "Issues")
 					 (function annals-task-template)))
 
-  (annals-update-org-capture-templates '("aI" "Annals Task/Issue as a new project"  entry
+  (annals-update-org-capture-templates '("aI" "Annals Task/Issue as a new org file"  entry
 					 (file annals-project-choose-new-task-annal)
 					 (function annals-task-template))))
 
