@@ -159,6 +159,11 @@
   :group 'tools
   :link '(url-link :tag "Github" "https://github.com/m0smith/annals/"))
 
+(defcustom annals-keymap-prefix nil
+  "Annals keymap prefix."
+  :group 'annals
+  :type 'string)
+
 (defcustom annals-active-tag "annals#active"
   "The tag that marks a headline as part of annals"
   :group 'annals
@@ -1445,19 +1450,100 @@ specific annals functionality."
 ;;desktop-buffers-not-to-save
   (add-to-list 'desktop-clear-preserve-buffers (buffer-name)))
 
-(defun annals-mode ()
-  "Startup annals by adding `org-capture' templates, task id and email expansion shortcuts."
+(defun annals-commit ()
+  "Use magit to update to commit the annals files."
   (interactive)
+  (magit-status-setup-buffer annals-active-directory))
+
+(defun annals-reset-buffer-name-counter ()
+  "Sets `annals-buffer-name-counter' to 1.
+For use with the `desktop-no-desktop-file-hook'"
+  (setq annals-buffer-name-counter 1))
+
+(defvar annals-command-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "t") #'annals-task)
+    (define-key map (kbd "C-t") #'annals-task)
+    (define-key map (kbd "a") #'annals-agenda)
+    (define-key map (kbd "C-a") #'annals-agenda)
+    map)
+  "Keymap for Annals commands after `annals-keymap-prefix'.")
+(fset 'annals-command-map annals-command-map)
+
+(defvar annals-mode-map
+  (let ((map (make-sparse-keymap)))
+    (when annals-keymap-prefix
+      (define-key map annals-keymap-prefix 'annals-command-map))
+    (easy-menu-define annals-mode-menu map
+      "Menu for Annals"
+      '("Annals"
+	["Agenda" annals-agenda]
+	["Create Task" annals-task]))
+    map)
+  "Keymap for Annals mode")
+
+(defun annals-mode-off ()
+  "Code to run when the annals-mode is enabled."
+  (remove-hook 'desktop-no-desktop-file-hook  'annals-reset-buffer-name-counter)
+
+  ;; Log
+
+  (remove-hook 'org-log-buffer-setup-hook  'annals-jira-log-hook )
+  
+  ;; C-c C-coooooooooooooooorg-
+  
+  (remove-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
+  
+  (remove-hook 'org-ctrl-c-ctrl-c-hook 'annals-task-id-to-link-hook)
+
+  (remove-hook 'org-ctrl-c-ctrl-c-hook 'annals-github-task-id-to-link-hook)
+  
+  (remove-hook 'org-ctrl-c-ctrl-c-hook 'annals-email-to-link-hook)
+  
+  (remove-hook 'org-ctrl-c-ctrl-c-hook 'annals-at-to-contact-hook)
+  
+  ;; TAB
+  
+  (remove-hook 'org-tab-before-tab-emulation-hook 'annals-capture-ics-attendee-hook)
+  
+  (remove-hook 'org-tab-before-tab-emulation-hook 'annals-task-id-to-link-hook)
+
+  (remove-hook 'org-tab-before-tab-emulation-hook 'annals-github-task-id-to-link-hook)
+  
+  (remove-hook 'org-tab-before-tab-emulation-hook 'annals-email-to-link-hook)
+  
+  (remove-hook 'org-tab-before-tab-emulation-hook 'annals-at-to-contact-hook)
+  
+  ;; EML
+  
+  ;; TODO (add-to-list 'auto-mode-alist '("\\.eml\\'" . annals-gnus-eml))
+
+  ;; ICS
+
+  (remove-hook 'org-capture-after-finalize-hook 'annals-capture-ics-delete-file)
+
+  ;; TODO (add-to-list 'auto-mode-alist '("\\.ics\\'" .   annals-capture-ics-mode))
+	       
+  ;; Capture
+
+  ;; TODO (annals-capture-templates-setup)
+
+  (remove-hook 'org-clock-in-hook 'annals-activate-task)
+  (remove-hook 'org-clock-out-hook 'annals-deactivate-task)
+  (remove-hook 'org-mode-hook 'annals-buffer-mode)
+  )
+
+
+(defun annals-mode-on ()
+  "Code to run when the annals-mode is enabled."
   (annals-add-active-to-clock-history)
-  (add-hook 'desktop-no-desktop-file-hook 
-	    (lambda ()
-	      (setq annals-buffer-name-counter 1)))
+  (add-hook 'desktop-no-desktop-file-hook  'annals-reset-buffer-name-counter)
 
   ;; Log
 
   (add-hook 'org-log-buffer-setup-hook  'annals-jira-log-hook )
   
-  ;; C-c C-c
+  ;; C-c C-coooooooooooooooorg-
   
   (add-hook 'org-ctrl-c-ctrl-c-hook 'annals-capture-ics-attendee-hook)
   
@@ -1499,7 +1585,19 @@ specific annals functionality."
 
   (add-hook 'org-clock-in-hook 'annals-activate-task)
   (add-hook 'org-clock-out-hook 'annals-deactivate-task)
-  (add-hook 'org-mode-hook 'annals-buffer-mode)
+  (add-hook 'org-mode-hook 'annals-buffer-mode))
+
+(define-minor-mode annals-mode
+  "Startup annals by adding `org-capture' templates, task id and email expansion shortcuts."
+  :init-value nil
+  :lighter " Â"
+  :global :t
+  :group 'annals
+  (if annals-mode
+      (annals-mode-on)
+    (annals-mode-off))
+  
+
   )
 
 
