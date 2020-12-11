@@ -281,6 +281,9 @@ The functions in the list will be called until one returns non-nil, meaning it a
 	  org-clock-history))
 
 (defun annals-activate-task ()
+:PROPERTIES:
+:ID: d6f63c69-dcf5-4d4c-87ab-a0bb0746cebc
+:END:
   (interactive)
   (let ((dir (org-attach-dir t))
 	(desktop-clear-preserve-buffers desktop-clear-preserve-buffers))
@@ -1462,10 +1465,12 @@ For use with the `desktop-no-desktop-file-hook'"
 
 (defvar annals-command-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "t") #'annals-task)
-    (define-key map (kbd "C-t") #'annals-task)
+    (define-key map (kbd "t") #'annals-capture)
+    (define-key map (kbd "C-t") #'annals-capture)
     (define-key map (kbd "a") #'annals-agenda)
     (define-key map (kbd "C-a") #'annals-agenda)
+    (define-key map (kbd "g") #'annals-commit)
+    (define-key map (kbd "C-g") #'annals-commit)
     map)
   "Keymap for Annals commands after `annals-keymap-prefix'.")
 (fset 'annals-command-map annals-command-map)
@@ -1478,7 +1483,10 @@ For use with the `desktop-no-desktop-file-hook'"
       "Menu for Annals"
       '("Annals"
 	["Agenda" annals-agenda]
-	["Create Task" annals-task]))
+	["Create Task" annals-capture]
+	["Activate" annals-activate]
+	["Deactivate" annals-deactivate]
+	["Commit to VC" annals-commit]))
     map)
   "Keymap for Annals mode")
 
